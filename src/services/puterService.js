@@ -16,7 +16,7 @@ function getPuterGlobal() {
   return window.puter || null;
 }
 
-function ensurePuterSdk() {
+export function ensurePuterSdk() {
   const existing = getPuterGlobal();
   if (existing) return Promise.resolve(existing);
   if (puterSdkPromise) return puterSdkPromise;
@@ -41,6 +41,19 @@ function ensurePuterSdk() {
   });
 
   return puterSdkPromise;
+}
+
+function extractPuterText(response) {
+  const text =
+    typeof response === "string"
+      ? response
+      : response?.message?.content ||
+        response?.text ||
+        (Array.isArray(response?.message?.content)
+          ? response.message.content.map((part) => part?.text || "").join("")
+          : "");
+
+  return String(text || "").trim();
 }
 
 function getStoredToken() {
@@ -106,17 +119,67 @@ async function chatWithPuterSdk(prompt, options = {}) {
   const response = await puter.ai.chat(prompt, {
     model: options.model || DEFAULT_MODEL,
   });
+  return extractPuterText(response);
+}
 
-  const text =
-    typeof response === "string"
-      ? response
-      : response?.message?.content ||
-        response?.text ||
-        (Array.isArray(response?.message?.content)
-          ? response.message.content.map((part) => part?.text || "").join("")
-          : "");
+export async function uploadFileToPuter(file) {
+  if (!(file instanceof File)) {
+    throw new Error("Missing file upload payload.");
+  }
 
-  return String(text || "").trim();
+  const puter = await ensurePuterSdk();
+  if (typeof puter?.fs?.write === "function") {
+    const result = await puter.fs.write(file);
+    return {
+      path: String(result?.path || result?.puter_path || "").trim(),
+      name: String(result?.name || file.name || "").trim(),
+      type: file.type || "",
+      size: Number(file.size || 0),
+    };
+  }
+
+  if (typeof puter?.fs?.upload === "function") {
+    const result = await puter.fs.upload([file]);
+    const uploaded = Array.isArray(result) ? result[0] : result;
+    return {
+      path: String(uploaded?.path || uploaded?.puter_path || "").trim(),
+      name: String(uploaded?.name || file.name || "").trim(),
+      type: file.type || "",
+      size: Number(file.size || 0),
+    };
+  }
+
+  throw new Error("Puter file upload is unavailable in this browser session.");
+}
+
+export async function chatWithPuterAttachment({ prompt, puterPath, model = DEFAULT_MODEL }) {
+  const normalizedPath = String(puterPath || "").trim();
+  if (!normalizedPath) {
+    throw new Error("Missing uploaded Puter file path.");
+  }
+
+  const puter = await ensurePuterSdk();
+  const response = await puter.ai.chat({
+    model,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "file", puter_path: normalizedPath },
+          {
+            type: "text",
+            text: String(prompt || "What do you see in this image?").trim(),
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = extractPuterText(response);
+  if (!text) {
+    throw new Error("Puter attachment chat returned an empty response.");
+  }
+  return text;
 }
 
 export async function chatWithPuter(prompt, options = {}) {

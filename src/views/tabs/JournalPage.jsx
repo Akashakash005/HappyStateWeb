@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IoAddOutline,
   IoArrowUp,
+  IoAttachOutline,
   IoClose,
+  IoImageOutline,
   IoMenu,
+  IoMicOutline,
   IoTrashOutline,
 } from "react-icons/io5";
 import { useTheme } from "../../state/ThemeContext";
@@ -17,10 +20,34 @@ import {
   analyzeJournalEntryWithContext,
   ensurePuterConnected,
 } from "../../services/journalAiService";
+import {
+  chatWithPuterAttachment,
+  uploadFileToPuter,
+} from "../../services/puterService";
 import { formatLongDate } from "../../utils/date";
 
-function textCanSend(draft, loading) {
-  return Boolean(String(draft || "").trim()) && !loading;
+const SUPPORTED_PRIVATE_ATTACH_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]);
+const MAX_PRIVATE_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
+function canSendMessage(draft, loading, pendingAttachment) {
+  return (!loading && Boolean(String(draft || "").trim())) || (!loading && Boolean(pendingAttachment));
+}
+
+function buildUserMessageText(text, attachment) {
+  const normalizedText = String(text || "").trim();
+  if (normalizedText) return normalizedText;
+  if (attachment?.name) return `Sent attachment: ${attachment.name}`;
+  return "Sent attachment";
+}
+
+function isImageAttachment(type = "") {
+  return String(type || "").startsWith("image/");
 }
 
 export default function JournalPage() {
@@ -33,7 +60,10 @@ export default function JournalPage() {
   const [connecting, setConnecting] = useState(false);
   const [puterSigned, setPuterSigned] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [composerError, setComposerError] = useState("");
+  const [pendingAttachment, setPendingAttachment] = useState(null);
   const chatWindowRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     getJournalSessions(mode).then(async (stored) => {
@@ -57,6 +87,14 @@ export default function JournalPage() {
     node.scrollTop = node.scrollHeight;
   }, [activeSessionId, loading, sessions]);
 
+  useEffect(() => {
+    if (isPrivateMode) return;
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    setPendingAttachment(null);
+  }, [isPrivateMode, pendingAttachment]);
+
   const activeSession = useMemo(
     () =>
       sessions.find((session) => session.id === activeSessionId) ||
@@ -70,20 +108,71 @@ export default function JournalPage() {
     try {
       await ensurePuterConnected();
       setPuterSigned(true);
+      setComposerError("");
     } finally {
       setConnecting(false);
     }
   }
 
+  function openAttachmentPicker() {
+    if (!isPrivateMode || !puterSigned || loading) return;
+    fileInputRef.current?.click();
+  }
+
+  function onAttachmentSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!SUPPORTED_PRIVATE_ATTACH_TYPES.has(file.type)) {
+      setComposerError("Private mode currently supports image attachments only.");
+      return;
+    }
+
+    if (file.size > MAX_PRIVATE_ATTACHMENT_SIZE) {
+      setComposerError("Attachment must be 10MB or smaller.");
+      return;
+    }
+
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+
+    setComposerError("");
+    setPendingAttachment({
+      file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      previewUrl: isImageAttachment(file.type) ? URL.createObjectURL(file) : "",
+    });
+  }
+
+  function clearPendingAttachment() {
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+    setPendingAttachment(null);
+  }
+
   async function onSubmit() {
     const text = draft.trim();
-    if (!text || !activeSession || loading) return;
+    if ((!text && !pendingAttachment) || !activeSession || loading) return;
 
+    const userMessageId = `msg_${Date.now()}_u_optimistic`;
     const optimisticUserMessage = {
-      id: `msg_${Date.now()}_u_optimistic`,
+      id: userMessageId,
       role: "user",
-      text,
+      text: buildUserMessageText(text, pendingAttachment),
       createdAt: new Date().toISOString(),
+      attachment: pendingAttachment
+        ? {
+            name: pendingAttachment.name,
+            type: pendingAttachment.type,
+            size: pendingAttachment.size,
+            previewUrl: pendingAttachment.previewUrl || "",
+          }
+        : null,
     };
 
     const nextSessions = sessions.map((session) => {
@@ -93,18 +182,72 @@ export default function JournalPage() {
         title:
           session.title === "New reflection" ||
           session.title === "Today reflection"
-            ? text.split(" ").slice(0, 6).join(" ")
+            ? buildUserMessageText(text, pendingAttachment).split(" ").slice(0, 6).join(" ")
             : session.title,
         updatedAt: new Date().toISOString(),
         messages: [...(session.messages || []), optimisticUserMessage],
       };
     });
 
+    const attachmentToSend = pendingAttachment;
     setSessions(nextSessions);
     setDraft("");
+    setPendingAttachment(null);
+    setComposerError("");
     setLoading(true);
 
     try {
+      if (attachmentToSend && isPrivateMode) {
+        const uploaded = await uploadFileToPuter(attachmentToSend.file);
+        const responseText = await chatWithPuterAttachment({
+          prompt: text || "What do you see in this image?",
+          puterPath: uploaded.path,
+          model: "grok-4-fast",
+        });
+
+        const persistedSessions = nextSessions.map((session) => {
+          if (session.id !== activeSession.id) return session;
+
+          const assistantMessage = {
+            id: `msg_${Date.now()}_a`,
+            role: "assistant",
+            text: responseText,
+            createdAt: new Date().toISOString(),
+          };
+          const entry = {
+            id: `entry_${Date.now()}`,
+            text: buildUserMessageText(text, attachmentToSend),
+            date: new Date().toISOString(),
+            sentimentScore: 0,
+            moodTag: "neutral",
+          };
+
+          return {
+            ...session,
+            updatedAt: new Date().toISOString(),
+            messages: [
+              ...(session.messages || []).map((message) =>
+                message.id === userMessageId
+                  ? {
+                      ...message,
+                      attachment: {
+                        ...(message.attachment || {}),
+                        puterPath: uploaded.path,
+                      },
+                    }
+                  : message,
+              ),
+              assistantMessage,
+            ],
+            entries: [...(session.entries || []), entry],
+          };
+        });
+
+        const saved = await saveJournalSessions(persistedSessions, mode);
+        setSessions(saved);
+        return;
+      }
+
       const analysis = await analyzeJournalEntryWithContext(text, {
         history: activeSession.messages || [],
         journalMode: mode,
@@ -172,6 +315,8 @@ export default function JournalPage() {
     setSessions(all);
     setActiveSessionId(next.id);
     setHistoryOpen(false);
+    setComposerError("");
+    clearPendingAttachment();
   }
 
   async function removeSession(id) {
@@ -227,8 +372,27 @@ export default function JournalPage() {
         <div className="chat-window journal-chat-window" ref={chatWindowRef}>
           {(activeSession?.messages || []).map((message) => (
             <div className={`bubble ${message.role}`} key={message.id}>
+              {message.attachment ? (
+                <div className="chat-attachment">
+                  {isImageAttachment(message.attachment.type) && message.attachment.previewUrl ? (
+                    <img
+                      className="chat-attachment-image"
+                      src={message.attachment.previewUrl}
+                      alt={message.attachment.name || "Attachment"}
+                    />
+                  ) : (
+                    <div className="chat-attachment-file">
+                      <IoAttachOutline size={15} />
+                      <span>{message.attachment.name || "Attachment"}</span>
+                    </div>
+                  )}
+                  <div className="chat-attachment-name">
+                    {message.attachment.name || "Attachment"}
+                  </div>
+                </div>
+              ) : null}
               <div>{message.text}</div>
-              <small>{formatLongDate(message.createdAt)}</small>
+              <small>[{formatLongDate(message.createdAt)}]</small>
             </div>
           ))}
           {loading ? (
@@ -236,22 +400,78 @@ export default function JournalPage() {
           ) : null}
         </div>
 
+        {pendingAttachment ? (
+          <div className="pending-attachment-bar">
+            <div className="pending-attachment-meta">
+              <IoImageOutline size={16} />
+              <span>{pendingAttachment.name}</span>
+            </div>
+            <button
+              className="icon-plain-btn pending-attachment-close"
+              onClick={clearPendingAttachment}
+              type="button"
+              aria-label="Remove attachment"
+            >
+              <IoClose size={16} />
+            </button>
+          </div>
+        ) : null}
+
+        {composerError ? <div className="error-copy">{composerError}</div> : null}
+
         <div className="composer app-composer">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={isPrivateMode ? "Drop the unfiltered truth" : "Ask anything"}
-            disabled={loading}
-          />
-          <button
-            className={`composer-send${textCanSend(draft, loading) ? " ready" : ""}`}
-            onClick={onSubmit}
-            type="button"
-            aria-label="Send message"
-            disabled={!textCanSend(draft, loading)}
-          >
-            <IoArrowUp size={18} />
-          </button>
+          <div className="composer-shell">
+            <button
+              className="composer-icon-btn composer-leading-btn"
+              type="button"
+              aria-label="Add attachment"
+              onClick={openAttachmentPicker}
+              disabled={!isPrivateMode || !puterSigned || loading}
+              title={
+                isPrivateMode
+                  ? puterSigned
+                    ? "Attach image"
+                    : "Connect Puter to attach images"
+                  : "Attachments are available only in private mode"
+              }
+            >
+              <IoAddOutline size={18} />
+            </button>
+            <input
+              ref={fileInputRef}
+              className="hidden-file-input"
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              onChange={onAttachmentSelected}
+              tabIndex={-1}
+            />
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={isPrivateMode ? "Drop the unfiltered truth" : "Ask anything"}
+              disabled={loading}
+            />
+            <div className="composer-actions">
+              <button
+                className="composer-icon-btn"
+                type="button"
+                aria-label="Voice input"
+                disabled
+                title="Voice input is not wired yet"
+              >
+                <IoMicOutline size={16} />
+              </button>
+              <button
+                className={`composer-send${canSendMessage(draft, loading, pendingAttachment) ? " ready" : ""}`}
+                onClick={onSubmit}
+                type="button"
+                aria-label="Send message"
+                disabled={!canSendMessage(draft, loading, pendingAttachment)}
+              >
+                <IoArrowUp size={18} />
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 

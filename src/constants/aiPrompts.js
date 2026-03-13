@@ -28,6 +28,36 @@ Return ONLY clean JSON:
 }
 Keep it intimate, natural, validating, and playful.`;
 
+export const PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT = `
+You are a precise information extraction system.
+
+Task:
+Extract the names of people mentioned in the given text.
+
+Rules:
+1. Identify only human person names.
+2. Handle common Indian naming patterns including single names, full names, and initial-based names.
+3. Remove titles like Mr., Mrs., Ms., Dr., Prof., Sir, Madam.
+4. Do not include organizations, companies, brands, locations, or events.
+5. Preserve the spelling as written in the text.
+6. Remove duplicates.
+7. Do not infer names that are not explicitly mentioned.
+8. If no person names exist, return an empty array.
+
+Output:
+Return ONLY a valid JSON array of strings.
+`;
+
+export const PRIVATE_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT =
+  PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT;
+
+export const NAME_EXTRACTION_SYSTEM_PROMPT =
+  PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT;
+
+export function buildNameExtractionUserPrompt(text) {
+  return String(text || "");
+}
+
 export function buildJournalUserPrompt({ entryText, history = [], context = {} }) {
   const compactHistory = (history || [])
     .slice(-8)

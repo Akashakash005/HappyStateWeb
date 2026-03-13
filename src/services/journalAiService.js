@@ -1,6 +1,10 @@
 import {
   GROK_JOURNAL_ANALYSIS_SYSTEM_PROMPT,
   JOURNAL_ANALYSIS_SYSTEM_PROMPT,
+  NAME_EXTRACTION_SYSTEM_PROMPT,
+  PRIVATE_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT,
+  PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT,
+  buildNameExtractionUserPrompt,
   buildJournalUserPrompt,
 } from "../constants/aiPrompts";
 import { buildJournalContext } from "./journalContextService";
@@ -60,6 +64,32 @@ function validateJournalAnalysisPayload(parsed) {
     sentiment: normalizeSentiment(parsed.sentiment),
     followUpQuestion: String(parsed.followUpQuestion || "").trim() || "What feels most important to explore next?",
   };
+}
+
+function validateNameExtractionPayload(parsed) {
+  if (Array.isArray(parsed)) {
+    return [
+      ...new Set(
+        parsed
+          .filter((item) => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  if (Array.isArray(parsed?.names)) {
+    return [
+      ...new Set(
+        parsed.names
+          .filter((item) => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  return null;
 }
 
 async function geminiChat({ systemPrompt, userPrompt, temperature = 0.3 }) {
@@ -140,6 +170,36 @@ function fallbackAnalysis(entryText) {
   };
 }
 
+function fallbackExtractNames(text) {
+  const matches = String(text).match(/\b[A-Z][a-z]+\b/g) || [];
+  const stopWords = new Set([
+    "I",
+    "Today",
+    "Yesterday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ]);
+  return [...new Set(matches.filter((word) => !stopWords.has(word)))];
+}
+
+function getCircleNameExtractionPrompt(journalMode = "public") {
+  if (journalMode === "private") {
+    return (
+      String(PRIVATE_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT || "").trim() ||
+      PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT
+    );
+  }
+  return (
+    String(PUBLIC_CIRCLE_NAME_EXTRACTION_SYSTEM_PROMPT || "").trim() ||
+    NAME_EXTRACTION_SYSTEM_PROMPT
+  );
+}
+
 export async function ensurePuterConnected() {
   return signInToPuter();
 }
@@ -164,5 +224,75 @@ export async function analyzeJournalEntryWithContext(entryText, options = {}) {
   } catch (error) {
     if (journalMode === "private") throw error;
     return fallbackAnalysis(entryText);
+  }
+}
+
+export async function extractPeopleNames(text, options = {}) {
+  const wantsDetailed = Boolean(options?.detailed);
+  const emptyResult = wantsDetailed
+    ? {
+        names: [],
+        provider: "none",
+        usedFallback: false,
+        reason: "empty_input",
+        puterNotConnected: false,
+        providerFailed: false,
+      }
+    : [];
+
+  if (!String(text).trim()) return emptyResult;
+
+  const journalMode = options.journalMode === "private" ? "private" : "public";
+
+  try {
+    const systemPrompt = getCircleNameExtractionPrompt(journalMode);
+    const userPrompt = buildNameExtractionUserPrompt(text);
+    const content =
+      journalMode === "private"
+        ? await chatWithPuter(`${systemPrompt}\n\n${userPrompt}\n\nReturn strict JSON only.`, {
+            model: "grok-4-fast",
+          })
+        : await geminiChat({ systemPrompt, userPrompt, temperature: 0 });
+
+    const parsed = validateNameExtractionPayload(safeJsonParse(content));
+    if (parsed) {
+      return wantsDetailed
+        ? {
+            names: parsed,
+            provider: journalMode === "private" ? "grok" : "gemini",
+            usedFallback: false,
+            reason: parsed.length ? "ok" : "no_names_found",
+            puterNotConnected: false,
+            providerFailed: false,
+          }
+        : parsed;
+    }
+
+    const fallback = fallbackExtractNames(text);
+    return wantsDetailed
+      ? {
+          names: fallback,
+          provider: journalMode === "private" ? "grok" : "gemini",
+          usedFallback: true,
+          reason: fallback.length ? "invalid_ai_response" : "no_names_found",
+          puterNotConnected: false,
+          providerFailed: true,
+        }
+      : fallback;
+  } catch (error) {
+    const fallback = fallbackExtractNames(text);
+    const message = String(error?.message || "");
+    const puterNotConnected =
+      /puter|popup blocked|auth token|sign-in|web environment/i.test(message);
+    return wantsDetailed
+      ? {
+          names: fallback,
+          provider: journalMode === "private" ? "grok" : "gemini",
+          usedFallback: true,
+          reason: fallback.length ? "provider_failed_fallback" : "no_names_found",
+          puterNotConnected,
+          providerFailed: true,
+        }
+      : fallback;
   }
 }

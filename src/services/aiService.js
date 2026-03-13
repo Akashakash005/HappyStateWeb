@@ -224,7 +224,9 @@ export async function generateInsight({ allEntries, selectedRange, userProfile =
   });
 
   const insight =
-    insightMode === "private" ? await chatWithPuter(prompt, { model: "grok-4-fast" }) : await callGeminiDirectly(prompt);
+    insightMode === "private"
+      ? await chatWithPuter(prompt, { model: "grok-4-fast" })
+      : await callGeminiDirectly(prompt);
   const newUsage = incrementUsageCount();
 
   return {

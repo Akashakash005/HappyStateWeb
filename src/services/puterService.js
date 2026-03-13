@@ -4,13 +4,52 @@ const USER_KEY = "happy_state_puter_user";
 const BACKEND_URL = String(
   import.meta.env.VITE_AI_BACKEND_URL || "https://happystate.vercel.app",
 ).trim();
+const PUTER_SDK_URL = "https://js.puter.com/v2/";
+
+let puterSdkPromise = null;
 
 function getBackendChatUrl() {
   return `${BACKEND_URL.replace(/\/$/, "")}/api/grok-chat`;
 }
 
+function getPuterGlobal() {
+  return window.puter || null;
+}
+
+function ensurePuterSdk() {
+  const existing = getPuterGlobal();
+  if (existing) return Promise.resolve(existing);
+  if (puterSdkPromise) return puterSdkPromise;
+
+  puterSdkPromise = new Promise((resolve, reject) => {
+    const current = document.querySelector(`script[src="${PUTER_SDK_URL}"]`);
+    if (current) {
+      current.addEventListener("load", () => resolve(getPuterGlobal()));
+      current.addEventListener("error", () => reject(new Error("Failed to load Puter SDK.")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = PUTER_SDK_URL;
+    script.async = true;
+    script.onload = () => resolve(getPuterGlobal());
+    script.onerror = () => reject(new Error("Failed to load Puter SDK."));
+    document.head.appendChild(script);
+  }).then((puter) => {
+    if (!puter?.ai?.chat) throw new Error("Puter SDK loaded, but AI chat is unavailable.");
+    return puter;
+  });
+
+  return puterSdkPromise;
+}
+
 function getStoredToken() {
   return String(window.sessionStorage.getItem(TOKEN_KEY) || "").trim();
+}
+
+function clearStoredAuth() {
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(USER_KEY);
 }
 
 function setStoredAuth(token, user) {
@@ -62,16 +101,63 @@ export async function signInToPuter() {
   });
 }
 
-export async function chatWithPuter(prompt, options = {}) {
-  const response = await fetch(getBackendChatUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: [{ content: prompt }],
-      model: options.model || DEFAULT_MODEL,
-    }),
+async function chatWithPuterSdk(prompt, options = {}) {
+  const puter = await ensurePuterSdk();
+  const response = await puter.ai.chat(prompt, {
+    model: options.model || DEFAULT_MODEL,
   });
-  if (!response.ok) throw new Error(await response.text());
-  const payload = await response.json();
-  return String(payload?.text || "").trim();
+
+  const text =
+    typeof response === "string"
+      ? response
+      : response?.message?.content ||
+        response?.text ||
+        (Array.isArray(response?.message?.content)
+          ? response.message.content.map((part) => part?.text || "").join("")
+          : "");
+
+  return String(text || "").trim();
+}
+
+export async function chatWithPuter(prompt, options = {}) {
+  try {
+    return await chatWithPuterSdk(prompt, options);
+  } catch (sdkError) {
+    const sdkMessage = String(sdkError?.message || "");
+    const userAuthToken = getStoredToken();
+    const response = await fetch(getBackendChatUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ content: prompt }],
+        model: options.model || DEFAULT_MODEL,
+        authToken: userAuthToken || undefined,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      let payload = null;
+      try {
+        payload = JSON.parse(errorText);
+      } catch {
+        payload = null;
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        clearStoredAuth();
+      }
+
+      if (payload?.hint || payload?.error) {
+        throw new Error(`${payload?.hint || payload?.error}${sdkMessage ? ` SDK fallback: ${sdkMessage}` : ""}`);
+      }
+      throw new Error(errorText || sdkMessage || "Puter request failed.");
+    }
+
+    const payload = await response.json();
+    const text = String(payload?.text || "").trim();
+    if (!text) {
+      throw new Error(sdkMessage || "Puter request returned an empty response.");
+    }
+    return text;
+  }
 }

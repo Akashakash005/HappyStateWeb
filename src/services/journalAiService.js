@@ -153,7 +153,9 @@ export async function analyzeJournalEntryWithContext(entryText, options = {}) {
     const userPrompt = buildJournalUserPrompt({ entryText, history, context });
     const content =
       journalMode === "private"
-        ? await chatWithPuter(`${systemPrompt}\n\n${userPrompt}\n\nReturn strict JSON only.`, { model: "grok-4-fast" })
+        ? await chatWithPuter(`${systemPrompt}\n\n${userPrompt}\n\nReturn strict JSON only.`, {
+            model: "grok-4-fast",
+          })
         : await geminiChat({ systemPrompt, userPrompt, temperature: 0.25 });
     const parsed = validateJournalAnalysisPayload(safeJsonParse(content));
     if (parsed) return parsed;

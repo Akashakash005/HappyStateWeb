@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { IoAddOutline, IoClose, IoMenu, IoTrashOutline } from "react-icons/io5";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  IoAddOutline,
+  IoArrowUp,
+  IoClose,
+  IoMenu,
+  IoTrashOutline,
+} from "react-icons/io5";
 import { useTheme } from "../../state/ThemeContext";
 import {
   createJournalSession,
@@ -13,6 +19,10 @@ import {
 } from "../../services/journalAiService";
 import { formatLongDate } from "../../utils/date";
 
+function textCanSend(draft, loading) {
+  return Boolean(String(draft || "").trim()) && !loading;
+}
+
 export default function JournalPage() {
   const { isPrivateMode } = useTheme();
   const mode = isPrivateMode ? "private" : "public";
@@ -23,26 +33,35 @@ export default function JournalPage() {
   const [connecting, setConnecting] = useState(false);
   const [puterSigned, setPuterSigned] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const chatWindowRef = useRef(null);
 
   useEffect(() => {
-    getJournalSessions().then(async (stored) => {
+    getJournalSessions(mode).then(async (stored) => {
       if (stored.length) {
         setSessions(stored);
         setActiveSessionId(stored[0].id);
       } else {
         const first = await createJournalSession(
           isPrivateMode ? "Private after dark" : "Today reflection",
+          mode,
         );
         setSessions([first]);
         setActiveSessionId(first.id);
       }
     });
-  }, [isPrivateMode]);
+  }, [isPrivateMode, mode]);
+
+  useEffect(() => {
+    const node = chatWindowRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [activeSessionId, loading, sessions]);
 
   const activeSession = useMemo(
     () =>
       sessions.find((session) => session.id === activeSessionId) ||
-      sessions[0],
+      sessions[0] ||
+      null,
     [activeSessionId, sessions],
   );
 
@@ -57,21 +76,43 @@ export default function JournalPage() {
   }
 
   async function onSubmit() {
-    if (!draft.trim() || !activeSession) return;
+    const text = draft.trim();
+    if (!text || !activeSession || loading) return;
+
+    const optimisticUserMessage = {
+      id: `msg_${Date.now()}_u_optimistic`,
+      role: "user",
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextSessions = sessions.map((session) => {
+      if (session.id !== activeSession.id) return session;
+      return {
+        ...session,
+        title:
+          session.title === "New reflection" ||
+          session.title === "Today reflection"
+            ? text.split(" ").slice(0, 6).join(" ")
+            : session.title,
+        updatedAt: new Date().toISOString(),
+        messages: [...(session.messages || []), optimisticUserMessage],
+      };
+    });
+
+    setSessions(nextSessions);
+    setDraft("");
     setLoading(true);
+
     try {
-      const analysis = await analyzeJournalEntryWithContext(draft, {
+      const analysis = await analyzeJournalEntryWithContext(text, {
         history: activeSession.messages || [],
         journalMode: mode,
       });
-      const nextSessions = sessions.map((session) => {
+
+      const persistedSessions = nextSessions.map((session) => {
         if (session.id !== activeSession.id) return session;
-        const userMessage = {
-          id: `msg_${Date.now()}_u`,
-          role: "user",
-          text: draft.trim(),
-          createdAt: new Date().toISOString(),
-        };
+
         const assistantMessage = {
           id: `msg_${Date.now()}_a`,
           role: "assistant",
@@ -80,30 +121,43 @@ export default function JournalPage() {
         };
         const entry = {
           id: `entry_${Date.now()}`,
-          text: draft.trim(),
+          text,
           date: new Date().toISOString(),
           sentimentScore: Number(analysis.sentiment || 0),
           moodTag: analysis.moodTag || "neutral",
         };
+
         return {
           ...session,
-          title:
-            session.title === "New reflection" ||
-            session.title === "Today reflection"
-              ? draft.trim().split(" ").slice(0, 6).join(" ")
-              : session.title,
           updatedAt: new Date().toISOString(),
-          messages: [
-            ...(session.messages || []),
-            userMessage,
-            assistantMessage,
-          ],
+          messages: [...(session.messages || []), assistantMessage],
           entries: [...(session.entries || []), entry],
         };
       });
-      const saved = await saveJournalSessions(nextSessions);
+
+      const saved = await saveJournalSessions(persistedSessions, mode);
       setSessions(saved);
-      setDraft("");
+    } catch (error) {
+      const assistantError = {
+        id: `msg_${Date.now()}_a_error`,
+        role: "assistant",
+        text:
+          error?.message ||
+          "Journal reply failed. Check the provider connection and try again.",
+        createdAt: new Date().toISOString(),
+      };
+
+      const errorSessions = nextSessions.map((session) => {
+        if (session.id !== activeSession.id) return session;
+        return {
+          ...session,
+          updatedAt: new Date().toISOString(),
+          messages: [...(session.messages || []), assistantError],
+        };
+      });
+
+      const saved = await saveJournalSessions(errorSessions, mode);
+      setSessions(saved);
     } finally {
       setLoading(false);
     }
@@ -112,15 +166,16 @@ export default function JournalPage() {
   async function startNewChat() {
     const next = await createJournalSession(
       isPrivateMode ? "Private after dark" : "New reflection",
+      mode,
     );
-    const all = await getJournalSessions();
+    const all = await getJournalSessions(mode);
     setSessions(all);
     setActiveSessionId(next.id);
     setHistoryOpen(false);
   }
 
   async function removeSession(id) {
-    const next = await deleteJournalSession(id);
+    const next = await deleteJournalSession(id, mode);
     setSessions(next);
     setActiveSessionId(next[0]?.id || "");
     setHistoryOpen(false);
@@ -162,13 +217,14 @@ export default function JournalPage() {
               className="primary-btn"
               onClick={onConnectPuter}
               type="button"
+              disabled={connecting}
             >
               {connecting ? "Connecting..." : "Connect with Puter"}
             </button>
           </div>
         ) : null}
 
-        <div className="chat-window journal-chat-window">
+        <div className="chat-window journal-chat-window" ref={chatWindowRef}>
           {(activeSession?.messages || []).map((message) => (
             <div className={`bubble ${message.role}`} key={message.id}>
               <div>{message.text}</div>
@@ -181,16 +237,20 @@ export default function JournalPage() {
         </div>
 
         <div className="composer app-composer">
-          <button className="composer-plus" onClick={startNewChat} type="button">
-            +
-          </button>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={isPrivateMode ? "Drop the unfiltered truth" : "Ask anything"}
+            disabled={loading}
           />
-          <button className="composer-send" onClick={onSubmit} type="button">
-            ↑
+          <button
+            className={`composer-send${textCanSend(draft, loading) ? " ready" : ""}`}
+            onClick={onSubmit}
+            type="button"
+            aria-label="Send message"
+            disabled={!textCanSend(draft, loading)}
+          >
+            <IoArrowUp size={18} />
           </button>
         </div>
       </section>

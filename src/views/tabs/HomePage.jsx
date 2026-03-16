@@ -184,13 +184,31 @@ export default function HomePage() {
 
   return (
     <div className="page-stack">
-      <div className="home-welcome">
-        Welcome back, <strong>{welcomeName}</strong> !
-      </div>
+    <div className="home-welcome">
+  Welcome back,{" "}
+  <strong
+    style={
+      isPrivateMode
+        ? {
+            background: "linear-gradient(135deg, #e31f01 0%, #a9a6a5 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            fontSize: "1.25rem",
+          }
+        : {background: "linear-gradient(135deg, #160092 0%, #d9d8df 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            fontSize: "1.25rem",}
+    }
+  >
+    {welcomeName}
+  </strong>{" "}
+  !
+</div>
 
       <div className="card gradient-card primary-form-card">
         <h2 className="form-title">What you are feeling now?</h2>
-        <div className="meta-line compact">
+        <div className="meta-line compact" style={{ color: isPrivateMode ? 'white' : 'black' }}>
           Date: {formatLongDate(draft.date)} | Slot: {capitalize(draft.slot)}
         </div>
         {existingEntryForSelection && existingEntryForSelection.id !== editingEntry?.id ? (
@@ -290,7 +308,7 @@ export default function HomePage() {
           {!groupedEntries.length ? <div className="muted">No entries found for this filter.</div> : null}
           {groupedEntries.map((group) => (
             <div key={group.date}>
-              <div className="entry-date-header">{formatLongDate(group.date)}</div>
+              <div className="entry-date-header" style={{ color: isPrivateMode ? 'white' : 'black' }}>{formatLongDate(group.date)}</div>
               {group.items.map((entry) => (
                 <div className="entry-card entry-gradient-card" key={entry.id}>
                   <div className="entry-row entry-top-actions">
@@ -306,7 +324,18 @@ export default function HomePage() {
                   </div>
                   {entry.note ? <div className="entry-note">{entry.note}</div> : null}
                   <div className="entry-badge-row">
-                    <span className="mood-badge">
+                    <span
+                      className="mood-badge"
+                      style={{
+                        background: (() => {
+                          const mood = moodOptions.find((item) => item.value === entry.mood);
+                          if (mood?.gradient) {
+                            return `linear-gradient(135deg, ${mood.gradient[0]}, ${mood.gradient[1]})`;
+                          }
+                          return mood?.color || '#ff831e';
+                        })()
+                      }}
+                    >
                       {moodOptions.find((item) => item.value === entry.mood)?.label}
                     </span>
                   </div>

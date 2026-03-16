@@ -1,27 +1,27 @@
 :root {
-  --background: #f5f7fb;
-  --surface: #ffffff;
-  --primary: #1d4ed8;
-  --text: #0f172a;
-  --textMuted: #64748b;
-  --border: #e2e8f0;
-  --overlay: rgba(15, 23, 42, 0.45);
-  --inputSurface: #f8fafc;
-  --inputAccent: #eff6ff;
-  --inputAccentBorder: #93c5fd;
-  --danger: #dc2626;
-  --dangerSurface: #fef2f2;
-  --dangerBorder: #fca5a5;
-  --appGray: #e5e7ed;
-  --cardBlueStart: #d9ddff;
-  --cardBlueMid: #8ca0ff;
-  --cardBlueEnd: #5c79ef;
-  --gradientAuth: linear-gradient(135deg, #0033ff, #3e58c1, #0e1b58);
-  --gradientCard: linear-gradient(135deg, #d9ddff, #8ca0ff, #5c79ef);
-  --gradientCardSoft: linear-gradient(135deg, #dfe5fb 0%, #b7c4f0 100%);
-  --gradientCardStrong: linear-gradient(135deg, #cfd7fb 0%, #6b86f5 100%);
-  --gradientAccent: linear-gradient(135deg, #6f86ee 0%, #5174ec 100%);
-  --gradientDanger: linear-gradient(135deg, #efdbe2 0%, #fb6c57 100%);
+  --background: #0a0a0a;
+  --surface: #1a1a1a;
+  --primary: #3b82f6;
+  --text: #ffffff;
+  --textMuted: #9ca3af;
+  --border: #374151;
+  --overlay: rgba(0, 0, 0, 0.7);
+  --inputSurface: #2a2a2a;
+  --inputAccent: #1e40af;
+  --inputAccentBorder: #3b82f6;
+  --danger: #ef4444;
+  --dangerSurface: #451a1a;
+  --dangerBorder: #7f1d1d;
+  --appGray: #1f1f1f;
+  --cardBlueStart: #1e3a8a;
+  --cardBlueMid: #3b82f6;
+  --cardBlueEnd: #60a5fa;
+  --gradientAuth: linear-gradient(135deg, #1e3a8a, #3b82f6, #1e40af);
+  --gradientCard: linear-gradient(135deg, #1e3a8a, #3b82f6, #1e40af);
+  --gradientCardSoft: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  --gradientCardStrong: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  --gradientAccent: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  --gradientDanger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
 }
 
 * {
@@ -31,7 +31,7 @@
 body {
   margin: 0;
   font-family: "Segoe UI", sans-serif;
-  background: #cfd4df;
+  background: var(--background);
   color: var(--text);
 }
 
@@ -1080,73 +1080,156 @@ textarea {
   height: 300px;
 }
 
-.analytics-switch-row,
-.analytics-filter-row {
-  margin-bottom: 0.35rem;
-  overflow-y: hidden;
-  overflow-x: auto;
-}
-
-.analytics-filter-row {
-  flex-wrap: nowrap;
-}
-
-.analytics-switch-row .chip,
-.analytics-filter-row .chip,
-.analytics-date-nav .chip {
-  min-height: 2.5rem;
-  padding: 0.72rem 1rem;
-  border-radius: 999px;
+.analytics-switch-row {
+  margin-bottom: 1rem;
+  display: flex;
   background: var(--inputSurface);
-  border-color: #dbe1ed;
-  color: var(--textMuted);
-  font-size: 0.92rem;
-  font-weight: 500;
-  box-shadow: none;
+  border-radius: 16px;
+  padding: 0.25rem;
+  position: relative;
+  overflow: hidden;
 }
 
-.analytics-switch-row .chip.active,
-.analytics-filter-row .chip.active,
-.analytics-date-nav .chip.active {
-  background: color-mix(in srgb, var(--primary) 10%, white);
-  border-color: color-mix(in srgb, var(--primary) 24%, white);
-  color: var(--primary);
-  box-shadow: none;
+.analytics-filter-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.analytics-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.analytics-switch-row .chip {
+  flex: 1;
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  color: var(--textMuted);
+  font-size: 1rem;
+  font-weight: 600;
+  position: relative;
+  z-index: 2;
+  transition: color 0.3s ease;
+}
+
+.analytics-switch-row .chip.active {
+  background: transparent;
+  color: white;
+}
+
+.analytics-switch-row::before {
+  content: '';
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  width: calc(50% - 0.25rem);
+  height: calc(100% - 0.5rem);
+  background: var(--gradientAccent);
+  border-radius: 12px;
+  transition: transform 0.3s ease;
+  z-index: 1;
+}
+
+.analytics-switch-row .chip:nth-child(2).active ~ ::before {
+  transform: translateX(100%);
 }
 
 .analytics-nav-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-radius: 16px;
+  background: var(--gradientCardStrong);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+.analytics-nav-block {
+  background: linear-gradient(145deg, #1a0f14, #12080d);
+  border-radius: 16px;
+  padding: 0.9rem;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+  margin-bottom: 1.2rem;
 }
 
 .analytics-date-nav {
-  margin-top: 0.25rem;
-  margin-bottom: 0.55rem;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+.analytics-date-nav .nav-arrow {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: 0.2s;
 }
 
-.analytics-nav-label {
-  color: var(--text);
-  font-weight: 700;
-  font-size: 0.8rem;
-  padding-inline: 0.1rem;
+.analytics-date-nav .nav-arrow:hover {
+  background: rgba(255,255,255,0.14);
 }
+.analytics-date-nav .date-range {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  background: var(--gradientAccent);
+  color: white;
+  letter-spacing: 0.3px;
+}
+.analytics-date-nav .today-btn {
+  background: var(--gradientAccent);
+  border: none;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.analytics-date-nav .today-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(255,80,80,0.35);
+}
+
+.analytics-nav-label{
+  padding-bottom: 1rem;
+}
+
 
 .analytics-mobile-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 1rem;
 }
 
 .analytics-hero-card,
 .analytics-slot-card,
 .analytics-advanced-card {
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   background: var(--gradientCardStrong);
-  box-shadow: none;
-  padding: 0.95rem;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 1rem;
 }
 
 .analytics-card-header {

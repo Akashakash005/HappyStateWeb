@@ -427,6 +427,7 @@ export default function AnalyticsPage() {
 
       {viewMode === "analytics" ? (
         <>
+          <div className="analytics-nav-label">Time Filter</div>
           <div className="chip-row analytics-filter-row analytics-chip-row">
             {filters.map((item) => (
               <button
@@ -440,18 +441,47 @@ export default function AnalyticsPage() {
             ))}
           </div>
 
-          <div className="analytics-nav-row analytics-date-nav">
-            <button className="chip" onClick={() => setReferenceDate(shiftReferenceDate(referenceDate, filter, -1))} type="button">
-              Prev
-            </button>
-            <div className="analytics-nav-label">{rangeLabel}</div>
-            <button className="chip" onClick={() => setReferenceDate(shiftReferenceDate(referenceDate, filter, 1))} type="button">
-              Next
-            </button>
-            <button className="chip active" onClick={() => setReferenceDate(new Date())} type="button">
-              Today
-            </button>
-          </div>
+        <div className="analytics-nav-block">
+
+  <div className="analytics-nav-label">Date Range</div>
+
+  <div className="analytics-date-nav">
+    <button
+      className="nav-arrow"
+      onClick={() =>
+        setReferenceDate(
+          shiftReferenceDate(referenceDate, filter, -1)
+        )
+      }
+      type="button"
+    >
+      ‹
+    </button>
+
+    <div >{rangeLabel}</div>
+
+    <button
+      className="nav-arrow"
+      onClick={() =>
+        setReferenceDate(
+          shiftReferenceDate(referenceDate, filter, 1)
+        )
+      }
+      type="button"
+    >
+      ›
+    </button>
+
+    <button
+      className="today-btn"
+      onClick={() => setReferenceDate(new Date())}
+      type="button"
+    >
+      Today
+    </button>
+  </div>
+
+</div>
 
           {filter === "custom" ? (
             <div className="form-grid two-up">

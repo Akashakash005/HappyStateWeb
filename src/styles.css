@@ -1611,14 +1611,60 @@ textarea {
 
 .streak-log-actions {
   margin-top: 0.9rem;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
 }
 
-.streak-clear-btn,
-.streak-save-btn {
-  min-width: 8.7rem;
+@media (max-width: 768px) {
+  .streak-log-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.streak-log-controls {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .streak-log-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.streak-label {
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--textMuted);
+}
+
+.streak-date-input,
+.streak-score-select {
   min-height: 2.6rem;
-  border-radius: 12px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--inputSurface);
+  color: var(--text);
+  padding: 0.7rem 0.85rem;
+  box-shadow: none;
+}
+
+.streak-score-select {
+  font-weight: 700;
+  background: var(--inputAccent);
+  color: var(--text);
+}
+
+.streak-log-subtitle {
+  margin-top: 0.35rem;
+  color: var(--textMuted);
+  font-size: 0.76rem;
 }
 
 .streak-clear-btn {

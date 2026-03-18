@@ -729,7 +729,7 @@ export default function AnalyticsPage() {
                 </select>
               </div>
               <div className="entry-row streak-log-controls">
-                <label className="streak-date-input streak-label">Category</label>
+                {/* <label className="streak-date-input streak-label">Category</label> */}
                 <select
                   className="streak-score-select"
                   value={trackerCategory}

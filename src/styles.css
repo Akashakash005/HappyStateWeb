@@ -101,12 +101,14 @@ textarea {
   margin: 0;
 
 }
+
 .drawer-title {
   padding-left: 0.5rem;
   font-size: 1.25rem;
   font-weight: 800;
-  
+
 }
+
 .auth-top {
   color: rgba(255, 255, 255, 0.82);
 }
@@ -151,6 +153,7 @@ textarea {
   border: 0;
   cursor: pointer;
 }
+
 .session-btn-title {
   font-weight: 700;
   color: var(--text);
@@ -204,7 +207,7 @@ textarea {
 .header-title {
   font-size: 1.15rem;
   font-weight: 800;
- 
+
 }
 
 .header-subtitle,
@@ -243,7 +246,7 @@ textarea {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(255,255,255,0.35), rgba(255,255,255,0.12));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.12));
   color: white;
   font-size: 2rem;
   font-weight: 800;
@@ -387,7 +390,7 @@ textarea {
   margin-top: 0.8rem;
 }
 
-.entry-actions-row > * {
+.entry-actions-row>* {
   flex: 1;
 }
 
@@ -397,7 +400,7 @@ textarea {
 }
 
 .two-up {
-   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .mood-row,
@@ -419,7 +422,7 @@ textarea {
 
 .mood-pill.active,
 .chip.active {
-  background: rgba(29, 78, 216, 0.08);
+  background: rgba(29, 79, 216, 0.514);
   color: var(--primary);
 }
 
@@ -428,6 +431,10 @@ textarea {
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   padding: 0.9rem;
+}
+
+.alert-card {
+  margin-top: 1.5rem;
 }
 
 .entries-section {
@@ -707,14 +714,17 @@ textarea {
   width: auto;
   min-width: 0;
 
-  height: 36px;          /* fixed initial height */
+  height: 36px;
+  /* fixed initial height */
   min-height: 36px;
   max-height: 92px;
 
-  line-height: 36px;     /* ⭐ vertical center trick */
+  line-height: 36px;
+  /* ⭐ vertical center trick */
 
   border: 0;
-  padding: 0 6px;        /* remove top/bottom padding */
+  padding: 0 6px;
+  /* remove top/bottom padding */
   resize: none;
   background: transparent;
   outline: none;
@@ -1031,7 +1041,7 @@ textarea {
   background: var(--primary);
   border-radius: 0;
   padding: 0.5rem 0.35rem 0.7rem;
-  border-top: 1px solid rgba(255,255,255,0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .bottom-link {
@@ -1061,8 +1071,10 @@ textarea {
   background: rgba(255, 255, 255, 0.45);
   display: flex;
   flex-direction: column;
-  justify-content: center;   /* vertical center */
-  align-items: center;       /* horizontal center */
+  justify-content: center;
+  /* vertical center */
+  align-items: center;
+  /* horizontal center */
   text-align: center;
 }
 
@@ -1136,7 +1148,7 @@ textarea {
   z-index: 1;
 }
 
-.analytics-switch-row .chip:nth-child(2).active ~ ::before {
+.analytics-switch-row.calendar-active::before {
   transform: translateX(100%);
 }
 
@@ -1155,11 +1167,11 @@ textarea {
 }
 
 .analytics-nav-block {
-  background: linear-gradient(145deg, #1a0f14, #12080d);
+  background: var(--gradientCard);
   border-radius: 16px;
   padding: 0.9rem;
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
   margin-bottom: 1.2rem;
 }
 
@@ -1169,9 +1181,10 @@ textarea {
   align-items: center;
   gap: 0.6rem;
 }
+
 .analytics-date-nav .nav-arrow {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   width: 36px;
   height: 36px;
@@ -1182,18 +1195,20 @@ textarea {
 }
 
 .analytics-date-nav .nav-arrow:hover {
-  background: rgba(255,255,255,0.14);
+  background: rgba(255, 255, 255, 0.14);
 }
+
 .analytics-date-nav .date-range {
   text-align: center;
   font-weight: 700;
   font-size: 0.95rem;
   padding: 0.55rem;
   border-radius: 12px;
-  background: var(--gradientAccent);
+  background: var(--primary);
   color: white;
   letter-spacing: 0.3px;
 }
+
 .analytics-date-nav .today-btn {
   background: var(--gradientAccent);
   border: none;
@@ -1207,11 +1222,16 @@ textarea {
 
 .analytics-date-nav .today-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(255,80,80,0.35);
+  box-shadow: 0 8px 20px rgba(255, 80, 80, 0.35);
 }
 
-.analytics-nav-label{
+.analytics-nav-label {
   padding-bottom: 1rem;
+}
+
+.streak-month-label {
+  padding-bottom: 0;
+  align-self: center;
 }
 
 
@@ -1268,7 +1288,7 @@ textarea {
   margin-top: 0.75rem;
   background: var(--inputSurface);
   border-radius: 12px;
-  padding: 0.45rem 0.35rem 0.15rem;
+  /* padding: 0.5rem 0.35rem 0.15rem; */
   min-height: 240px;
 }
 
@@ -1346,7 +1366,7 @@ textarea {
   font-size: 1.04rem;
 }
 
-.analytics-slot-box > span:last-of-type {
+.analytics-slot-box>span:last-of-type {
   display: block;
   margin-top: 0.05rem;
   color: var(--text);
@@ -1372,23 +1392,28 @@ textarea {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  justify-content: center;   /* vertical center */
-  align-items: center;       /* horizontal center */
+  justify-content: center;
+  /* vertical center */
+  align-items: center;
+  /* horizontal center */
   text-align: center;
 }
 
 /* label */
 .stat-label {
   font-size: 0.82rem;
-  font-weight: 500;     /* normal */
+  font-weight: 500;
+  /* normal */
   color: var(--textMuted);
   margin-bottom: 6px;
 }
 
 /* value */
 .stat-value {
-  font-size: 1.45rem;   /* BIG */
-  font-weight: 800;     /* BOLD */
+  font-size: 1.45rem;
+  /* BIG */
+  font-weight: 800;
+  /* BOLD */
   color: var(--text);
 }
 
@@ -1463,7 +1488,7 @@ textarea {
 .streak-metric-card {
   min-height: 66px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--gradientCardStrong);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1499,7 +1524,8 @@ textarea {
 .streak-month-nav {
   gap: 0.65rem;
   flex-wrap: nowrap;
-  justify-content: flex-start;
+  justify-content: space-between;
+  margin-top: 0.9rem;
 }
 
 .streak-month-chip {
@@ -1509,6 +1535,7 @@ textarea {
   border-color: var(--border);
   color: var(--text);
   font-weight: 600;
+
 }
 
 .streak-month-label {
@@ -1516,13 +1543,20 @@ textarea {
   white-space: nowrap;
   color: var(--text);
   font-weight: 800;
+
+  display: flex;
+  /* required */
+  align-items: center;
+  /* vertical center */
+  justify-content: center;
+  /* horizontal center */
 }
 
 .streak-log-card {
   margin-top: 0.9rem;
   border: 0;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--gradientCard);
   padding: 0.85rem;
   box-shadow: none;
 }
@@ -1543,9 +1577,18 @@ textarea {
   margin-top: 0.7rem;
 }
 
+.streak-label {
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--textMuted);
+}
+
 .streak-date-input,
 .streak-score-select {
   min-height: 2.6rem;
+  min-width: 10rem;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--inputSurface);
@@ -1960,6 +2003,37 @@ textarea {
   margin-top: 0.75rem;
 }
 
+.topics-container {
+  margin-top: 0.6rem;
+}
+
+.topic-input-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.topic-input {
+  flex: 9;
+  /* 90% */
+  min-height: 2.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--inputSurface);
+  padding: 0.6rem;
+  color: var(--text);
+}
+
+.topic-add-btn {
+  flex: 1;
+  /* 10% */
+  min-height: 2.6rem;
+  border-radius: 10px;
+  background: var(--inputAccent);
+  color: var(--text);
+  font-weight: bold;
+  cursor: pointer;
+}
+
 .manual-tag-grid-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -2039,7 +2113,7 @@ textarea {
   .two-up,
   .composer {
     grid-template-columns: 1fr;
-   
+
   }
 
   .journal-inner-header {
@@ -2047,10 +2121,10 @@ textarea {
   }
 
   .auth-top,
-  
+
   .app-header {
     flex-direction: row;
-    
+
   }
 
   .bottom-nav {
@@ -2110,7 +2184,7 @@ textarea {
     font-size: 0.84rem;
   }
 
-  .analytics-slot-box > span:last-of-type,
+  .analytics-slot-box>span:last-of-type,
   .analytics-slot-box small {
     font-size: 0.68rem;
   }

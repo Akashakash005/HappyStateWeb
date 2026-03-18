@@ -89,8 +89,8 @@ export default function CirclePage() {
       <h2 className="circle-page-title">Building Your Circle</h2>
       <p className="circle-page-copy">
         {isPrivateMode
-          ? "Private mode surfaces who is teasing you, recurring, or heating up."
-          : "Your Circle automatically detects people you mention and reveals how those connections correlate with your emotional patterns."}
+          ? "Private mode surfaces who you mention in brackets like [name]."
+          : "Your Circle automatically detects people you mention in brackets like [name] and reveals how those connections correlate with your emotional patterns."}
       </p>
 
       <div className="card gradient-card circle-discovery-card">
@@ -151,15 +151,9 @@ export default function CirclePage() {
 
       {error ? <div className="error-copy">{error}</div> : null}
 
-      {state?.extractionMeta?.puterNotConnected ? (
-        <div className="card status-card">Puter not connected</div>
-      ) : null}
-      {state?.extractionMeta?.providerFailed ? (
-        <div className="card status-card">AI provider failed, used fallback extraction</div>
-      ) : null}
       {state?.extractionMeta?.entriesWithNoNames > 0 ? (
         <div className="card status-card">
-          No names found in {state.extractionMeta.entriesWithNoNames} entr{state.extractionMeta.entriesWithNoNames === 1 ? "y" : "ies"}.
+          No bracketed [names] found in {state.extractionMeta.entriesWithNoNames} entr{state.extractionMeta.entriesWithNoNames === 1 ? "y" : "ies"}.
         </div>
       ) : null}
 
@@ -174,8 +168,8 @@ export default function CirclePage() {
         {!people.length ? (
           <div className="muted">
             {isPrivateMode
-              ? "No repeated names yet. Mention someone at least twice in private logs to surface the pattern."
-              : "No repeated names yet. Mention people at least twice in journal chats."}
+              ? "No repeated names yet. Mention someone in brackets [name] at least twice to surface the pattern."
+              : "No repeated names yet. Mention people in brackets [name] at least twice in your entries."}
           </div>
         ) : viewMode === "summary" ? (
           <div className="list-stack">
@@ -215,20 +209,10 @@ export default function CirclePage() {
         ) : (
           <div className="list-stack">
             {people.map((person) => (
-              <div className="entry-card circle-entry-card" key={person.key}>
-                <div className="circle-person-top">
-                  <strong>{person.person}</strong>
-                  <button
-                    className="icon-chip-btn"
-                    onClick={() => openEditModal(person)}
-                    type="button"
-                    aria-label={`Edit ${person.person}`}
-                  >
-                    <IoCreateOutline size={15} />
-                  </button>
-                </div>
-                <div>Other Names: {(person.aliases || []).join(", ") || "None"}</div>
+              <div className="entry-card circle-card" key={person.key}>
+                <div style={{ fontWeight: 'bold' }}>{person.person}</div>
                 <div>Mentions: {person.mentionCount}</div>
+                <div>Avg Mood: {person.avgMood.toFixed(1)}</div>
               </div>
             ))}
           </div>

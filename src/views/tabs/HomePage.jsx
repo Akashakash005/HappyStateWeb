@@ -128,6 +128,7 @@ export default function HomePage() {
       mood: entry.mood,
       note: entry.note || "",
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function confirmDelete() {

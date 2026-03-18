@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { getJournalSessions } from "./journalService";
+import { getEntries } from "./entriesService";
 import { getActiveCharacterMode } from "./characterModeService";
 import { buildCircle } from "../utils/buildCircle";
 import {
@@ -169,8 +169,7 @@ export async function getCircleState(modeOverride = null) {
 export async function refreshCircleState(modeOverride = null) {
   const mode = normalizeCharacterMode(modeOverride || getActiveCharacterMode());
   const current = await getCircleState(mode);
-  const sessions = await getJournalSessions(mode);
-  const entries = sessions.flatMap((session) => session.entries || []);
+  const entries = await getEntries(mode);
   const analysis = await buildCircle(entries, { journalMode: mode });
   const nextState = {
     people: Array.isArray(analysis?.people) ? analysis.people : [],

@@ -1,4 +1,4 @@
-import { extractPeopleNames } from "../services/journalAiService";
+// Manual name extraction replaces journalAiService
 
 const RELATION_ALIASES = {
   mom: "Mother",
@@ -89,11 +89,10 @@ function moodLabelFromAverage(avgMood) {
 }
 
 export async function buildCircle(entries, options = {}) {
-  const extractor = options.extractor || extractPeopleNames;
   const journalMode = options.journalMode === "private" ? "private" : "public";
   const map = new Map();
   const extractionMeta = {
-    provider: journalMode === "private" ? "grok" : "gemini",
+    provider: "manual",
     totalEntries: 0,
     entriesWithNoNames: 0,
     fallbackCount: 0,
@@ -101,21 +100,20 @@ export async function buildCircle(entries, options = {}) {
     puterNotConnected: false,
     lastMessage: "",
   };
-
+console.log("Entries received:", entries);
   for (const entry of entries || []) {
-    const text = String(entry?.text || "").trim();
+    const text = String(entry?.text || entry?.note || "").trim();
     if (!text) continue;
     extractionMeta.totalEntries += 1;
 
-    const extractedResult = await extractor(text, { journalMode, detailed: true });
-    const extractedNames = [...new Set((extractedResult?.names || []).map(normalizeName).filter(Boolean))];
-    if (extractedResult?.usedFallback) extractionMeta.fallbackCount += 1;
-    if (extractedResult?.providerFailed) extractionMeta.providerFailed = true;
-    if (extractedResult?.puterNotConnected) extractionMeta.puterNotConnected = true;
-    if (extractedResult?.reason) extractionMeta.lastMessage = extractedResult.reason;
+    // Manual extraction: extract any text within [ ]
+    const bracketMatches = [...text.matchAll(/\[(.*?)\]/g)];
+    const extractedNames = [...new Set(bracketMatches.map((m) => normalizeName(m[1])).filter(Boolean))];
 
+    // Optionally include the old relation matching as fallback, but rely mainly on []
     const relationNames = extractRelationMentions(text);
     const names = [...new Set([...extractedNames, ...relationNames])];
+
     if (!names.length) {
       extractionMeta.entriesWithNoNames += 1;
       continue;
@@ -156,7 +154,7 @@ export async function buildCircle(entries, options = {}) {
   }
 
   const people = [...map.values()]
-    .filter((item) => item.mentionCount >= 2)
+    .filter((item) => item.mentionCount >= 1)
     .map((item) => {
       const avgMood = item.moodSamples.length
         ? Number((item.moodSamples.reduce((sum, value) => sum + value, 0) / item.moodSamples.length).toFixed(2))

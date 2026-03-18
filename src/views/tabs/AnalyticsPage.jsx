@@ -43,12 +43,89 @@ const BASE_FILTERS = [
 ];
 
 const PRODUCTIVITY_LEVELS = [
-  { value: 0, label: "0 / Grey", subtitle: "No productivity log", color: "#9CA3AF", textColor: "#0F172A" },
-  { value: 1, label: "1 / Yellow", subtitle: "Some progress", color: "#FACC15", textColor: "#0F172A" },
-  { value: 2, label: "2 / Light Green", subtitle: "Good output", color: "#86EFAC", textColor: "#14532D" },
-  { value: 3, label: "3 / Dark Green", subtitle: "Locked in", color: "#166534", textColor: "#FFFFFF" },
+  {
+    value: 0,
+    label: "0 / No Start",
+    subtitle: "Take the first step",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+  {
+    value: 1,
+    label: "1 / Getting Started",
+    subtitle: "You broke the inertia",
+    color: "#FDE68A",        // soft yellow
+    textColor: "#78350F"
+  },
+  {
+    value: 2,
+    label: "2 / Building Momentum",
+    subtitle: "Consistency forming",
+    color: "#86EFAC",        // light green
+    textColor: "#14532D"
+  },
+  {
+    value: 3,
+    label: "3 / Strong Progress",
+    subtitle: "You're in the zone",
+    color: "#4ADE80",        // medium green
+    textColor: "#064E3B"
+  },
+  {
+    value: 4,
+    label: "4 / High Performance",
+    subtitle: "Serious focus achieved",
+    color: "#22C55E",        // deeper green
+    textColor: "#052E16"
+  },
+  {
+    value: 5,
+    label: "5 / Elite Execution",
+    subtitle: "Peak productivity unlocked",
+    color: "#166534",        // dark rich green
+    textColor: "#FFFFFF"
+  }
 ];
-
+const PRODUCTIVITY_CATEGORY = [
+  {
+    value: 0,
+    label: "Competetive exams",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+  {
+    value: 0,
+    label: "coding",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+  {
+    value: 0,
+    label: "other",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+];
+const PRIVATE_CATEGORY = [
+  {
+    value: 0,
+    label: "image",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+  {
+    value: 0,
+    label: "video",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+  {
+    value: 0,
+    label: "other",
+    color: "#E5E7EB",        // soft gray
+    textColor: "#374151"
+  },
+];
 const PRIVATE_LEVELS = [
   { value: 0, label: "0 / Silver", subtitle: "Calm day", color: "#C0C0C0", textColor: "#111111" },
   { value: 1, label: "1 / Pink", subtitle: "Teasing", color: "#FF8FB1", textColor: "#4A1022" },
@@ -275,7 +352,7 @@ function createMetrics(filteredEntries, slotAverage, isPrivateMode = false) {
   );
   const balance = Math.round(
     ((isPrivateMode ? levels.filter((level) => level >= 4).length : scores.filter((s) => s > 0).length) / (total || 1)) *
-      100,
+    100,
   );
   const last3 = scores.slice(-3);
   const momentum = last3.length >= 2 ? round2(last3[last3.length - 1] - last3[0]) : 0;
@@ -304,6 +381,8 @@ export default function AnalyticsPage() {
   const [trackerMonthDate, setTrackerMonthDate] = useState(startOfMonth(new Date()));
   const [trackerDate, setTrackerDate] = useState(new Date());
   const [trackerScore, setTrackerScore] = useState(0);
+  const [trackerCategory, setTrackerCategory] = useState("");
+  const [trackerTopics, setTrackerTopics] = useState([]);
   const initialCustomRange = useMemo(() => getDateRange("month", new Date()), []);
   const [customStartDate, setCustomStartDate] = useState(initialCustomRange.start);
   const [customEndDate, setCustomEndDate] = useState(initialCustomRange.end);
@@ -317,6 +396,7 @@ export default function AnalyticsPage() {
   }, []);
 
   const activityLevels = useMemo(() => (isPrivateMode ? PRIVATE_LEVELS : PRODUCTIVITY_LEVELS), [isPrivateMode]);
+  const activityCategory = useMemo(() => (isPrivateMode ? PRIVATE_CATEGORY : PRODUCTIVITY_CATEGORY), [isPrivateMode]);
   const filters = useMemo(() => {
     const halfYearLabel = getHalfYearRange(referenceDate).label.split(" ")[0];
     return BASE_FILTERS.map((item) => (item.key === "halfyear" ? { ...item, label: halfYearLabel } : item));
@@ -384,6 +464,12 @@ export default function AnalyticsPage() {
   );
   const selectedTrackerDateKey = useMemo(() => toDateKey(trackerDate), [trackerDate]);
   const selectedTrackerEntry = activityMap[selectedTrackerDateKey] || null;
+  const [currentTopic, setCurrentTopic] = useState("");
+  // Initialize trackerTopics side-effect when clicking calendar
+  useEffect(() => {
+    setTrackerCategory(selectedTrackerEntry?.category || "");
+    setTrackerTopics(selectedTrackerEntry?.topics || []);
+  }, [selectedTrackerDateKey, selectedTrackerEntry]);
   const trackerLevel =
     activityLevels.find((item) => item.value === trackerScore) || activityLevels[0];
   const calendarCells = useMemo(() => getCalendarCells(trackerMonthDate), [trackerMonthDate]);
@@ -396,23 +482,31 @@ export default function AnalyticsPage() {
       activityEntries.filter((entry) => entry.date.startsWith(`${trackerMonthDate.getFullYear()}-${String(trackerMonthDate.getMonth() + 1).padStart(2, "0")}`)),
     [activityEntries, trackerMonthDate],
   );
-  const trackerAverage = monthEntries.length ? average(monthEntries.map((entry) => Number(entry.score || 0))) : 0;
+  const nonZeroMonthEntries = useMemo(
+    () => monthEntries.filter((entry) => Number(entry.score || 0) > 0),
+    [monthEntries],
+  );
+  const trackerAverage = nonZeroMonthEntries.length ? average(nonZeroMonthEntries.map((entry) => Number(entry.score || 0))) : 0;
   const trackerStreak = useMemo(() => getCurrentStreak(activityMap), [activityMap]);
 
   async function saveTrackerScore() {
-    const updated = await upsertActivityCalendarEntry({ date: trackerDate, score: trackerScore });
+    const cleanedTopics = trackerTopics.map(t => typeof t === "string" ? t.trim() : "").filter(Boolean);
+    const updated = await upsertActivityCalendarEntry({ date: trackerDate, score: trackerScore, category: trackerCategory, topics: cleanedTopics });
     setActivityEntries(updated);
+    setTrackerTopics(cleanedTopics);
   }
 
   async function clearTrackerScore() {
     const updated = await deleteActivityCalendarEntry(trackerDate);
     setActivityEntries(updated);
     setTrackerScore(0);
+    setTrackerCategory("");
+    setTrackerTopics([]);
   }
 
   return (
     <div >
-      <div className="chip-row analytics-switch-row">
+      <div className={`chip-row analytics-switch-row${viewMode === 'calendar' ? ' calendar-active' : ''}`}>
         {VIEW_OPTIONS.map((option) => (
           <button
             key={option.key}
@@ -441,47 +535,47 @@ export default function AnalyticsPage() {
             ))}
           </div>
 
-        <div className="analytics-nav-block">
+          <div className="analytics-nav-block">
 
-  <div className="analytics-nav-label">Date Range</div>
+            {/* <div className="analytics-nav-label">Date Range</div> */}
 
-  <div className="analytics-date-nav">
-    <button
-      className="nav-arrow"
-      onClick={() =>
-        setReferenceDate(
-          shiftReferenceDate(referenceDate, filter, -1)
-        )
-      }
-      type="button"
-    >
-      ‹
-    </button>
+            <div className="analytics-date-nav">
+              <button
+                className="nav-arrow"
+                onClick={() =>
+                  setReferenceDate(
+                    shiftReferenceDate(referenceDate, filter, -1)
+                  )
+                }
+                type="button"
+              >
+                ‹
+              </button>
 
-    <div >{rangeLabel}</div>
+              <div className="date-range">{rangeLabel}</div>
 
-    <button
-      className="nav-arrow"
-      onClick={() =>
-        setReferenceDate(
-          shiftReferenceDate(referenceDate, filter, 1)
-        )
-      }
-      type="button"
-    >
-      ›
-    </button>
+              <button
+                className="nav-arrow"
+                onClick={() =>
+                  setReferenceDate(
+                    shiftReferenceDate(referenceDate, filter, 1)
+                  )
+                }
+                type="button"
+              >
+                ›
+              </button>
 
-    <button
+              {/* <button
       className="today-btn"
       onClick={() => setReferenceDate(new Date())}
       type="button"
     >
       Today
-    </button>
-  </div>
+    </button> */}
+            </div>
 
-</div>
+          </div>
 
           {filter === "custom" ? (
             <div className="form-grid two-up">
@@ -501,34 +595,34 @@ export default function AnalyticsPage() {
                     X-axis: {filter === "day" ? "Slot" : "Day"} | Y-axis: {isPrivateMode ? "Level" : "Mood score"}
                   </div>
                 </div>
-               
+
               </div>
 
               <div className="analytics-chart-shell">
                 <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 6, left: -18 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
-                  <XAxis dataKey="label" tickMargin={8} />
-                 <YAxis
-  domain={isPrivateMode ? [1, 5] : [-1, 1]}
-  width={40}
-  tickMargin={6}
-  label={{
-    value: isPrivateMode ? "Intensity" : "Mood",
-    angle: -90,
-    position: "insideLeft",
-    style: { textAnchor: "middle" }
-  }}
-/>
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="var(--primary)"
-                    strokeWidth={3}
-                    dot={{ r: 3 }}
-                  />
-                </LineChart>
+                  <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 6, left: -8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
+                    <XAxis dataKey="label" tickMargin={8} />
+                    <YAxis
+                      domain={isPrivateMode ? [1, 5] : [-1, 1]}
+                      width={40}
+                      tickMargin={6}
+                      label={{
+                        value: isPrivateMode ? "Intensity" : "Mood",
+                        angle: -90,
+                        position: "insideLeft",
+                        style: { textAnchor: "middle" }
+                      }}
+                    />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="var(--primary)"
+                      strokeWidth={3}
+                      dot={{ r: 3 }}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -553,16 +647,16 @@ export default function AnalyticsPage() {
                 {isPrivateMode ? "Hottest" : "Best"}: {formatSlotName(metrics.bestSlot.slot)} ({scoreToPercent(metrics.bestSlot.average)}%) | {isPrivateMode ? "Coolest" : "Worst"}: {formatSlotName(metrics.worstSlot.slot)} ({scoreToPercent(metrics.worstSlot.average)}%)
               </div>
               <div className="slot-average-grid analytics-slot-grid">
-              {slotAverage.map((slot) => (
-                <div className="metric-box analytics-slot-box" key={slot.slot}>
-                  <span className="slot-dot" style={{ backgroundColor: slotColor(slot.average, isPrivateMode) }} />
-                  <span>{formatSlotName(slot.slot)}</span>
-                  {isPrivateMode ? null : <strong>{slot.average.toFixed(2)}</strong>}
-                  <small>{scoreLabel(slot.average, isPrivateMode)}</small>
-                </div>
-              ))}
+                {slotAverage.map((slot) => (
+                  <div className="metric-box analytics-slot-box" key={slot.slot}>
+                    <span className="slot-dot" style={{ backgroundColor: slotColor(slot.average, isPrivateMode) }} />
+                    <span>{formatSlotName(slot.slot)}</span>
+                    {isPrivateMode ? null : <strong>{slot.average.toFixed(2)}</strong>}
+                    <small>{scoreLabel(slot.average, isPrivateMode)}</small>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
             <div className="card gradient-card analytics-advanced-card">
               <div className="entry-row analytics-card-header">
@@ -586,122 +680,199 @@ export default function AnalyticsPage() {
         </>
       ) : (
         <>
-        <div className="card gradient-card streak-shell-card">
-          <h3 className="analytics-card-title">{isPrivateMode ? "Naughty Calendar" : "Productivity Calendar"}</h3>
-          <p className="streak-shell-copy">
-            {isPrivateMode
-              ? "One private score per day for how naughty the character felt."
-              : "One public score per day for how productive the character felt."}
-          </p>
+          <div className="card">
+            <h3 className="analytics-card-title">{isPrivateMode ? "Naughty Calendar" : "Productivity Calendar"}</h3>
+            <p className="streak-shell-copy">
+              {isPrivateMode
+                ? "One private score per day for how naughty the character felt."
+                : "One public score per day for how productive the character felt."}
+            </p>
 
-          <div className="streak-metrics-grid">
-            <div className="streak-metric-card">
-              <span>Current Streak</span>
-              <strong>{trackerStreak}</strong>
-            </div>
-            <div className="streak-metric-card">
-              <span>Month Logs</span>
-              <strong>{monthEntries.length}</strong>
-            </div>
-            <div className="streak-metric-card">
-              <span>Month Avg</span>
-              <strong>{trackerAverage.toFixed(1)}</strong>
-            </div>
-          </div>
-
-          <div className="legend-levels streak-legend-levels">
-            {activityLevels.map((level) => (
-              <div className="legend-level streak-legend-level" key={level.value} style={{ backgroundColor: level.color, color: level.textColor }}>
-                {level.value}
+            <div className="streak-metrics-grid">
+              <div className="streak-metric-card">
+                <span>Current Streak</span>
+                <strong>{trackerStreak}</strong>
               </div>
-            ))}
-          </div>
-
-          <div className="analytics-nav-row streak-month-nav">
-            <button className="chip streak-month-chip" onClick={() => setTrackerMonthDate(shiftMonth(trackerMonthDate, -1))} type="button">
-              Prev Month
-            </button>
-            <div className="analytics-nav-label streak-month-label">{trackerMonthLabel}</div>
-            <button className="chip streak-month-chip" onClick={() => setTrackerMonthDate(shiftMonth(trackerMonthDate, 1))} type="button">
-              Next Month
-            </button>
-          </div>
-
-          <div className="entry-card streak-log-card">
-            <strong className="streak-log-title">{isPrivateMode ? "Naughty Log" : "Productive Log"}</strong>
-            <div className="streak-log-date">{formatLongDate(selectedTrackerDateKey)}</div>
-            <div className="form-grid two-up streak-log-controls">
-              <input className="streak-date-input" type="date" value={selectedTrackerDateKey} onChange={(e) => setTrackerDate(new Date(e.target.value))} />
-              <select className="streak-score-select" value={trackerScore} onChange={(e) => setTrackerScore(Number(e.target.value))}>
-                {activityLevels.map((level) => (
-                  <option key={level.value} value={level.value}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
+              <div className="streak-metric-card">
+                <span>Month Logs</span>
+                <strong>{nonZeroMonthEntries.length}</strong>
+              </div>
+              <div className="streak-metric-card">
+                <span>Month Avg</span>
+                <strong>{trackerAverage.toFixed(1)}</strong>
+              </div>
             </div>
-            <div className="streak-log-subtitle">{trackerLevel.subtitle}</div>
-            <div className="entry-row streak-log-actions">
-              <button className="secondary-btn streak-clear-btn" onClick={clearTrackerScore} type="button">Clear</button>
-              <button className="primary-btn streak-save-btn" onClick={saveTrackerScore} type="button">
-                {selectedTrackerEntry ? "Update Log" : "Save Log"}
+
+
+
+            <div className="analytics-nav-row streak-month-nav">
+              <button className="chip streak-month-chip" onClick={() => setTrackerMonthDate(shiftMonth(trackerMonthDate, -1))} type="button">
+                Prev
+              </button>
+              <div className="analytics-nav-label streak-month-label">{trackerMonthLabel}</div>
+              <button className="chip streak-month-chip" onClick={() => setTrackerMonthDate(shiftMonth(trackerMonthDate, 1))} type="button">
+                Next
               </button>
             </div>
-          </div>
 
-          
-        </div>
-        <div className="card streak-calendar-card">
-        <div className="calendar-grid streak-calendar-grid">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div className="calendar-weekday" key={day}>{day}</div>
-            ))}
-            {calendarCells.map((cell, index) => {
-              if (!cell) return <div className="calendar-empty" key={`blank-${index}`} />;
-              const dateKey = toDateKey(cell);
-              const savedScore = Number(activityMap[dateKey]?.score || 0);
-              const level = activityLevels.find((item) => item.value === savedScore) || activityLevels[0];
-              const selected = dateKey === selectedTrackerDateKey;
-              return (
-                <button
-                  key={dateKey}
-                  className={`calendar-cell streak-calendar-cell${selected ? " selected" : ""}`}
-                  style={{ backgroundColor: level.color, color: level.textColor }}
-                  onClick={() => {
-                    setTrackerDate(cell);
-                    setTrackerMonthDate(startOfMonth(cell));
-                    setTrackerScore(savedScore);
-                  }}
-                  type="button"
+            <div className="entry-card streak-log-card">
+              <strong className="streak-log-title">{isPrivateMode ? "Naughty Log" : "Productive Log"}</strong>
+              <div className="streak-log-date">{formatLongDate(selectedTrackerDateKey)}</div>
+              <div className="entry-row streak-log-actions">
+                <input className="streak-date-input" type="date" value={selectedTrackerDateKey} onChange={(e) => setTrackerDate(new Date(e.target.value))} />
+                <select className="streak-score-select" value={trackerScore} onChange={(e) => setTrackerScore(Number(e.target.value))}>
+                  {activityLevels.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="entry-row streak-log-controls">
+                <label className="streak-date-input streak-label">Category</label>
+                <select
+                  className="streak-score-select"
+                  value={trackerCategory}
+                  onChange={(e) => setTrackerCategory(e.target.value)}
                 >
-                  {cell.getDate()}
+                  <option value="" disabled>Select a category...</option>
+                  {activityCategory.map((cat) => (
+                    <option key={cat.label} value={cat.label}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+
+
+              {trackerCategory && (
+                <div className="topics-container">
+
+                  {/* Input Row */}
+                  <div className="topic-input-row">
+                    <input
+                      className="topic-input"
+                      placeholder="Type topic..."
+                      value={currentTopic}
+                      onChange={(e) => setCurrentTopic(e.target.value)}
+                    />
+
+                    <button
+                      type="button"
+                      className="topic-add-btn"
+                      onClick={() => {
+                        if (!currentTopic.trim()) return;
+
+                        setTrackerTopics([...trackerTopics, currentTopic.trim()]);
+                        setCurrentTopic(""); // clear input
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Topics List */}
+                  {trackerTopics.length > 0 && (
+                    <div className="topics-list">
+                      {trackerTopics.map((topic, index) => (
+                        <div className="manual-tag-grid-row" key={`topic_${index}`}>
+                          <input
+                            className="cell"
+                            value={topic}
+                            onChange={(e) => {
+                              const next = [...trackerTopics];
+                              next[index] = e.target.value;
+                              setTrackerTopics(next);
+                            }}
+                          />
+                          <button
+                            className="manual-tag-delete-btn"
+                            onClick={() => {
+                              const next = [...trackerTopics];
+                              next.splice(index, 1);
+                              setTrackerTopics(next);
+                            }}
+                            type="button"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="streak-log-subtitle">{trackerLevel.subtitle}</div>
+              <div className="entry-row streak-log-actions">
+                <button className="secondary-btn streak-clear-btn" onClick={clearTrackerScore} type="button">Clear</button>
+                <button className="primary-btn streak-save-btn" onClick={saveTrackerScore} type="button">
+                  {selectedTrackerEntry ? "Update Log" : "Save Log"}
                 </button>
-              );
-            })}
+              </div>
+            </div>
+
+
           </div>
+          <div className="card streak-calendar-card">
+            <div className="legend-levels streak-legend-levels">
+              {activityLevels.map((level) => (
+                <div className="legend-level streak-legend-level" key={level.value} style={{ backgroundColor: level.color, color: level.textColor }}>
+                  {level.value}
+                </div>
+              ))}
+            </div>
+            <div className="calendar-grid streak-calendar-grid">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div className="calendar-weekday" key={day}>{day}</div>
+              ))}
+              {calendarCells.map((cell, index) => {
+                if (!cell) return <div className="calendar-empty" key={`blank-${index}`} />;
+                const dateKey = toDateKey(cell);
+                const savedScore = Number(activityMap[dateKey]?.score || 0);
+                const level = activityLevels.find((item) => item.value === savedScore) || activityLevels[0];
+                const selected = dateKey === selectedTrackerDateKey;
+                return (
+                  <button
+                    key={dateKey}
+                    className={`calendar-cell streak-calendar-cell${selected ? " selected" : ""}`}
+                    style={{ backgroundColor: level.color, color: level.textColor }}
+                    onClick={() => {
+                      setTrackerDate(cell);
+                      setTrackerMonthDate(startOfMonth(cell));
+                      setTrackerScore(savedScore);
+                    }}
+                    type="button"
+                  >
+                    {cell.getDate()}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </>
 
       )}
- <div className="page-stack">
-      {faqOpen ? (
-        <div className="modal-backdrop" onClick={() => setFaqOpen(false)}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <div className="entry-row">
-              <h3>{isPrivateMode ? "Private Analytics FAQ" : "Public Analytics FAQ"}</h3>
-              <button className="chip" onClick={() => setFaqOpen(false)} type="button">Close</button>
-            </div>
-            <div className="list-stack">
-              {(isPrivateMode ? FAQ_PRIVATE : FAQ_PUBLIC).map(([title, description]) => (
-                <div className="entry-card" key={title}>
-                  <strong>{title}</strong>
-                  <div className="muted">{description}</div>
-                </div>
-              ))}
+      <div className="page-stack">
+        {faqOpen ? (
+          <div className="modal-backdrop" onClick={() => setFaqOpen(false)}>
+            <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+              <div className="entry-row">
+                <h3>{isPrivateMode ? "Private Analytics FAQ" : "Public Analytics FAQ"}</h3>
+                <button className="chip" onClick={() => setFaqOpen(false)} type="button">Close</button>
+              </div>
+              <div className="list-stack">
+                {(isPrivateMode ? FAQ_PRIVATE : FAQ_PUBLIC).map(([title, description]) => (
+                  <div className="entry-card" key={title}>
+                    <strong>{title}</strong>
+                    <div className="muted">{description}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
       </div>
     </div>
   );

@@ -30,6 +30,8 @@ function normalizeCalendarEntry(entry) {
     id: entry.id || date,
     date,
     score: clampScore(entry.score),
+    category: String(entry.category || ""),
+    topics: Array.isArray(entry.topics) ? entry.topics : [],
     createdAt: entry.createdAt || updatedAt,
     updatedAt,
   };
@@ -141,9 +143,11 @@ export async function saveActivityCalendarEntries(entries, modeOverride = null) 
   return normalized;
 }
 
-export async function upsertActivityCalendarEntry({ date, score }, modeOverride = null) {
+export async function upsertActivityCalendarEntry({ date, score, category, topics }, modeOverride = null) {
   const safeDate = toDateKey(date || new Date());
   const safeScore = clampScore(score);
+  const safeCategory = String(category || "");
+  const safeTopics = Array.isArray(topics) ? topics : [];
   const nowISO = new Date().toISOString();
   const existing = await getActivityCalendarEntries(modeOverride);
   const index = existing.findIndex((item) => item.date === safeDate);
@@ -151,6 +155,8 @@ export async function upsertActivityCalendarEntry({ date, score }, modeOverride 
     id: safeDate,
     date: safeDate,
     score: safeScore,
+    category: safeCategory,
+    topics: safeTopics,
     updatedAt: nowISO,
   };
   if (index >= 0) existing[index] = { ...existing[index], ...nextEntry };

@@ -13,15 +13,12 @@ import {
 } from "../../services/circleService";
 import { formatLongDate } from "../../utils/date";
 
-function moodCorrelationLabel(avgMood, isPrivateMode = false) {
-  if (isPrivateMode) {
-    if (avgMood >= 0.2) return "High tease";
-    if (avgMood <= -0.2) return "Low tease";
-    return "Mixed signal";
-  }
-  if (avgMood >= 0.2) return "Positive";
-  if (avgMood <= -0.2) return "Stress-linked";
-  return "Mixed";
+function formatIntensity(percent) {
+  if (percent <= -60) return "⚡ High Pressure";
+  if (percent < -20) return "⚡ Pressure";
+  if (percent >= 60) return "🟢 Strong Positive";
+  if (percent > 20) return "🟢 Positive";
+  return "Neutral";
 }
 
 export default function CirclePage() {
@@ -30,13 +27,16 @@ export default function CirclePage() {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [viewMode, setViewMode] = useState("summary");
+  const [viewMode, setViewMode] = useState("extracted");
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editKey, setEditKey] = useState("");
   const [editPerson, setEditPerson] = useState("");
   const [editAliases, setEditAliases] = useState("");
 
   useEffect(() => {
+    setHasAnalyzed(false);
+    setViewMode("extracted");
     getCircleState(mode).then(setState);
   }, [mode]);
 
@@ -55,6 +55,8 @@ export default function CirclePage() {
     try {
       const next = await refreshCircleState(mode);
       setState(next);
+      setHasAnalyzed(true);
+      setViewMode("summary");
     } catch (nextError) {
       setError(nextError?.message || "Failed to analyze connections.");
     } finally {
@@ -128,6 +130,8 @@ export default function CirclePage() {
           className={`segment-btn${viewMode === "summary" ? " active" : ""}`}
           onClick={() => setViewMode("summary")}
           type="button"
+          disabled={!hasAnalyzed}
+          title={hasAnalyzed ? "View circle summary" : "Run Analyze My Connections to unlock the summary"}
         >
           Circle Summary
         </button>
@@ -151,11 +155,7 @@ export default function CirclePage() {
 
       {error ? <div className="error-copy">{error}</div> : null}
 
-      {state?.extractionMeta?.entriesWithNoNames > 0 ? (
-        <div className="card status-card">
-          No bracketed [names] found in {state.extractionMeta.entriesWithNoNames} entr{state.extractionMeta.entriesWithNoNames === 1 ? "y" : "ies"}.
-        </div>
-      ) : null}
+      
 
       <div className="card">
         <h3>{viewMode === "summary" ? "Interaction Pattern Cards" : "Name | Other Names"}</h3>
@@ -168,8 +168,8 @@ export default function CirclePage() {
         {!people.length ? (
           <div className="muted">
             {isPrivateMode
-              ? "No repeated names yet. Mention someone in brackets [name] at least twice to surface the pattern."
-              : "No repeated names yet. Mention people in brackets [name] at least twice in your entries."}
+              ? "No names found yet. Enter interaction name at least twice to surface the pattern."
+              : "No names found yet. Enter interaction name at least twice to surface the pattern."}
           </div>
         ) : viewMode === "summary" ? (
           <div className="list-stack">
@@ -187,13 +187,12 @@ export default function CirclePage() {
                   </button>
                 </div>
                 <div className="circle-correlation">
-                  {moodCorrelationLabel(person.avgMood, isPrivateMode)}
+                  {formatIntensity(person.interactionIntensity)}
                 </div>
                 <div>Other Names: {(person.aliases || []).join(", ") || "None"}</div>
                 <div>Mentions: {person.mentionCount}</div>
                 <div>
-                  {isPrivateMode ? "Average Level" : "Average Mood Score"}:{" "}
-                  {isPrivateMode ? person.avgLevel.toFixed(2) : person.avgMood.toFixed(2)}
+                  Interaction Intensity: {Number(person.interactionIntensity || 0).toFixed(1)}%
                 </div>
                 {isPrivateMode ? (
                   <>
@@ -218,7 +217,7 @@ export default function CirclePage() {
           </div>
         )}
 
-        {viewMode === "summary" ? (
+        {viewMode === "summary" && hasAnalyzed ? (
           <div className="list-stack circle-summary-stack">
             <div className="card circle-summary-card">
               <h4>{isPrivateMode ? "Who is teasing you more?" : "Who brings positive energy?"}</h4>

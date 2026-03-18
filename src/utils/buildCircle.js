@@ -1,68 +1,11 @@
-// Manual name extraction replaces journalAiService
-
-const RELATION_ALIASES = {
-  mom: "Mother",
-  mother: "Mother",
-  mummy: "Mother",
-  dad: "Father",
-  father: "Father",
-  papa: "Father",
-  boss: "Boss",
-  manager: "Manager",
-  wife: "Wife",
-  husband: "Husband",
-  partner: "Partner",
-  boyfriend: "Boyfriend",
-  girlfriend: "Girlfriend",
-  brother: "Brother",
-  sister: "Sister",
-  son: "Son",
-  daughter: "Daughter",
-  friend: "Friend",
-};
-
-const NICKNAME_TO_CANONICAL = {
-  alex: "Alex",
-  alexander: "Alex",
-  mike: "Michael",
-  michael: "Michael",
-  sam: "Sam",
-  samantha: "Sam",
-  dan: "Daniel",
-  danny: "Daniel",
-  daniel: "Daniel",
-  chris: "Chris",
-  christopher: "Chris",
-};
-
 function normalizeName(name) {
-  return String(name || "").trim().replace(/\s+/g, " ");
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function canonicalKey(name) {
-  const normalized = normalizeName(name).toLowerCase().replace(/[^\w\s]/g, "");
-  if (!normalized) return "";
-  if (RELATION_ALIASES[normalized]) return RELATION_ALIASES[normalized].toLowerCase();
-  if (NICKNAME_TO_CANONICAL[normalized]) return NICKNAME_TO_CANONICAL[normalized].toLowerCase();
-  return normalized;
-}
-
-function displayNameFromKey(key, fallback = "") {
-  const raw = String(key || "").trim();
-  if (!raw) return normalizeName(fallback);
-  const relation = RELATION_ALIASES[raw];
-  if (relation) return relation;
-  const canonical = NICKNAME_TO_CANONICAL[raw];
-  if (canonical) return canonical;
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
-function extractRelationMentions(text) {
-  const lower = String(text || "").toLowerCase();
-  const matches = Object.keys(RELATION_ALIASES).filter((token) =>
-    new RegExp(`\\b${token}\\b`, "i").test(lower),
-  );
-  return [...new Set(matches.map((token) => RELATION_ALIASES[token]))];
+  return normalizeName(name).toLowerCase();
 }
 
 function toMoodScore(value) {
@@ -82,17 +25,50 @@ function toLevelScore(value) {
   return 1;
 }
 
-function moodLabelFromAverage(avgMood) {
-  if (avgMood >= 0.2) return "positive";
-  if (avgMood <= -0.2) return "negative";
+function toMentionDate(entry) {
+  return (
+    entry?.dateISO ||
+    entry?.actualLoggedAt ||
+    entry?.date ||
+    new Date().toISOString()
+  );
+}
+
+function getRelationshipType({ pressureCount, positiveCount }) {
+  const signalCount = pressureCount + positiveCount;
+
+  if (signalCount === 0) return "neutral";
+
+  const pressureRatio = pressureCount / signalCount;
+  const positiveRatio = positiveCount / signalCount;
+
+  if (pressureRatio >= 0.6) return "pressure";
+  if (positiveRatio >= 0.6) return "positive";
+
   return "mixed";
+}
+
+function buildSegments(people) {
+  return {
+    people,
+    positiveEnergy: people
+      .filter((person) => person.positiveRatio >= 0.5)
+      .sort((a, b) => b.positiveRatio - a.positiveRatio),
+    stressCorrelated: people
+      .filter((person) => person.pressureRatio >= 0.5)
+      .sort((a, b) => b.pressureRatio - a.pressureRatio),
+    mostFrequent: [...people].sort((a, b) => b.mentionCount - a.mentionCount),
+    risingRecently: [...people].sort(
+      (a, b) => new Date(b.lastMentionDate) - new Date(a.lastMentionDate),
+    ),
+  };
 }
 
 export async function buildCircle(entries, options = {}) {
   const journalMode = options.journalMode === "private" ? "private" : "public";
   const map = new Map();
   const extractionMeta = {
-    provider: "manual",
+    provider: "interactions",
     totalEntries: 0,
     entriesWithNoNames: 0,
     fallbackCount: 0,
@@ -100,108 +76,170 @@ export async function buildCircle(entries, options = {}) {
     puterNotConnected: false,
     lastMessage: "",
   };
-console.log("Entries received:", entries);
+
   for (const entry of entries || []) {
-    const text = String(entry?.text || entry?.note || "").trim();
-    if (!text) continue;
     extractionMeta.totalEntries += 1;
+    const interactions = Array.isArray(entry?.interactions)
+      ? entry.interactions
+      : [];
+    let hasAnyName = false;
 
-    // Manual extraction: extract any text within [ ]
-    const bracketMatches = [...text.matchAll(/\[(.*?)\]/g)];
-    const extractedNames = [...new Set(bracketMatches.map((m) => normalizeName(m[1])).filter(Boolean))];
+    for (const interaction of interactions) {
+      const person = normalizeName(interaction?.person);
+      if (!person) continue;
+      hasAnyName = true;
 
-    // Optionally include the old relation matching as fallback, but rely mainly on []
-    const relationNames = extractRelationMentions(text);
-    const names = [...new Set([...extractedNames, ...relationNames])];
+      const key = canonicalKey(person);
+      if (!key) continue;
 
-    if (!names.length) {
-      extractionMeta.entriesWithNoNames += 1;
-      continue;
-    }
-
-    const moodValue = toMoodScore(entry?.mood ?? entry?.sentimentScore);
-    const mentionDate = entry?.date || new Date().toISOString();
-
-    names.forEach((name) => {
-      const key = canonicalKey(name);
-      if (!key) return;
-      const isRelationHeuristic = relationNames.includes(name) && !extractedNames.includes(name);
-      const mentionConfidence = isRelationHeuristic ? 0.6 : 0.85;
+      const normalizedEmotion = String(interaction?.emotion || "")
+        .trim()
+        .toLowerCase();
+      const emotion = ["positive", "neutral", "pressure"].includes(
+        normalizedEmotion,
+      )
+        ? normalizedEmotion
+        : "neutral";
+      const mentionDate = toMentionDate(entry);
 
       const current = map.get(key) || {
-        person: displayNameFromKey(key, name),
+        key,
+        person,
         mentionCount: 0,
+        pressureCount: 0,
+        neutralCount: 0,
+        positiveCount: 0,
         moodSamples: [],
         levelSamples: [],
-        confidenceSamples: [],
         aliases: [],
         lastMentionDate: mentionDate,
       };
 
-      const display = displayNameFromKey(key, name);
-      current.person = current.person.length >= display.length ? current.person : display;
       current.mentionCount += 1;
-      current.moodSamples.push(moodValue);
-      current.levelSamples.push(toLevelScore(entry?.mood ?? entry?.sentimentScore));
-      current.confidenceSamples.push(mentionConfidence);
-      if (!current.aliases.includes(name)) current.aliases.push(name);
+      current.moodSamples.push(toMoodScore(entry?.mood ?? entry?.score));
+      current.levelSamples.push(toLevelScore(entry?.mood ?? entry?.score));
+
+      if (emotion === "pressure") current.pressureCount += 1;
+      else if (emotion === "positive") current.positiveCount += 1;
+      else current.neutralCount += 1;
+
+      if (!current.aliases.includes(person)) current.aliases.push(person);
       if (new Date(mentionDate) > new Date(current.lastMentionDate)) {
         current.lastMentionDate = mentionDate;
       }
 
       map.set(key, current);
-    });
+    }
+
+    if (!hasAnyName) extractionMeta.entriesWithNoNames += 1;
   }
 
   const people = [...map.values()]
     .filter((item) => item.mentionCount >= 1)
     .map((item) => {
       const avgMood = item.moodSamples.length
-        ? Number((item.moodSamples.reduce((sum, value) => sum + value, 0) / item.moodSamples.length).toFixed(2))
-        : 0;
-      const avgLevel = item.levelSamples.length
-        ? Number((item.levelSamples.reduce((sum, value) => sum + value, 0) / item.levelSamples.length).toFixed(2))
-        : 1;
-      const peakLevel = item.levelSamples.length ? Number(Math.max(...item.levelSamples).toFixed(2)) : 1;
-      const highIntensityCount = item.levelSamples.filter((value) => value >= 4).length;
-      const recentLevels = item.levelSamples.slice(-3);
-      const recentHeat = recentLevels.length
-        ? Number((recentLevels.reduce((sum, value) => sum + value, 0) / recentLevels.length).toFixed(2))
-        : avgLevel;
-      const confidence = item.confidenceSamples.length
         ? Number(
             (
-              item.confidenceSamples.reduce((sum, value) => sum + value, 0) /
-              item.confidenceSamples.length
+              item.moodSamples.reduce((sum, value) => sum + value, 0) /
+              item.moodSamples.length
             ).toFixed(2),
           )
-        : 0.5;
+        : 0;
+      const avgLevel = item.levelSamples.length
+        ? Number(
+            (
+              item.levelSamples.reduce((sum, value) => sum + value, 0) /
+              item.levelSamples.length
+            ).toFixed(2),
+          )
+        : 1;
+      const peakLevel = item.levelSamples.length
+        ? Number(Math.max(...item.levelSamples).toFixed(2))
+        : 1;
+      const highIntensityCount = item.levelSamples.filter(
+        (value) => value >= 4,
+      ).length;
+      const recentLevels = item.levelSamples.slice(-3);
+      const recentHeat = recentLevels.length
+        ? Number(
+            (
+              recentLevels.reduce((sum, value) => sum + value, 0) /
+              recentLevels.length
+            ).toFixed(2),
+          )
+        : avgLevel;
+      const signalCount = item.pressureCount + item.positiveCount;
 
+      const interactionScore =
+        item.positiveCount * 1 +
+        item.neutralCount * 0 +
+        item.pressureCount * -1;
+
+      const maxPossible = item.mentionCount || 0;
+      const interactionIntensity = maxPossible
+        ? Number(((interactionScore / maxPossible) * 100).toFixed(1))
+        : 0;
+
+      const pressureRatio = signalCount
+        ? Number((item.pressureCount / signalCount).toFixed(2))
+        : 0;
+
+      const positiveRatio = signalCount
+        ? Number((item.positiveCount / signalCount).toFixed(2))
+        : 0;
       return {
-        key: canonicalKey(item.person),
+        key: item.key,
         person: item.person,
         mentionCount: item.mentionCount,
+
+        // ✅ ADD THESE HERE (INSIDE MAP)
+        pressureCount: item.pressureCount,
+        positiveCount: item.positiveCount,
+        neutralCount: item.neutralCount,
+
         avgMood,
         avgLevel,
         peakLevel,
         highIntensityCount,
         recentHeat,
-        moodCorrelation: moodLabelFromAverage(avgMood),
-        confidence,
+        pressureRatio,
+        positiveRatio,
+        interactionScore,
+        interactionIntensity,
+
+        moodCorrelation: getRelationshipType({
+          pressureCount: item.pressureCount,
+          positiveCount: item.positiveCount,
+        }),
+
+        confidence: Math.min(1, Number((item.mentionCount / 5).toFixed(2))),
         aliases: item.aliases,
         lastMentionDate: item.lastMentionDate,
       };
     })
-    .sort((a, b) => b.mentionCount - a.mentionCount || b.avgMood - a.avgMood);
+    .sort(
+      (a, b) =>
+        b.mentionCount - a.mentionCount || b.positiveRatio - a.positiveRatio,
+    );
 
   if (journalMode === "private") {
-    const byAvgLevel = [...people].sort((a, b) => b.avgLevel - a.avgLevel || b.mentionCount - a.mentionCount);
-    const byPeakLevel = [...people].sort((a, b) => b.peakLevel - a.peakLevel || b.highIntensityCount - a.highIntensityCount);
-    const byMentionCount = [...people].sort((a, b) => b.mentionCount - a.mentionCount || b.avgLevel - a.avgLevel);
-    const byRecentHeat = [...people].sort((a, b) => b.recentHeat - a.recentHeat || b.avgLevel - a.avgLevel);
+    const byAvgLevel = [...people].sort(
+      (a, b) => b.avgLevel - a.avgLevel || b.mentionCount - a.mentionCount,
+    );
+    const byPeakLevel = [...people].sort(
+      (a, b) =>
+        b.peakLevel - a.peakLevel ||
+        b.highIntensityCount - a.highIntensityCount,
+    );
+    const byMentionCount = [...people].sort(
+      (a, b) => b.mentionCount - a.mentionCount || b.avgLevel - a.avgLevel,
+    );
+    const byRecentHeat = [...people].sort(
+      (a, b) => b.recentHeat - a.recentHeat || b.avgLevel - a.avgLevel,
+    );
 
     return {
-      people,
+      ...buildSegments(people),
       topTeasing: byAvgLevel.slice(0, 3),
       peakTriggers: byPeakLevel.slice(0, 3),
       mostFrequent: byMentionCount.slice(0, 3),
@@ -210,10 +248,5 @@ console.log("Entries received:", entries);
     };
   }
 
-  return {
-    people,
-    positiveEnergy: people.filter((person) => person.avgMood >= 0.2),
-    stressCorrelated: people.filter((person) => person.avgMood <= -0.2),
-    extractionMeta,
-  };
+  return { ...buildSegments(people), extractionMeta };
 }

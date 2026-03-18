@@ -56,6 +56,21 @@ function normalizeEntry(entry) {
   const mood = Math.max(1, Math.min(5, Number(entry.mood || 3)));
   const date = entry.date || fallbackDate;
   const slot = entry.slot || fallbackSlot;
+  const interactions = Array.isArray(entry.interactions)
+    ? entry.interactions
+        .map((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+          const person = String(item.person || "").trim();
+          if (!person) return null;
+          const normalizedEmotion = String(item.emotion || "").trim().toLowerCase();
+          const emotion = ["positive", "neutral", "pressure"].includes(normalizedEmotion)
+            ? normalizedEmotion
+            : "neutral";
+          const context = String(item.context || "").trim();
+          return { person, context, emotion };
+        })
+        .filter(Boolean)
+    : [];
   return {
     id: entry.id || `${date}_${slot}`,
     date,
@@ -63,6 +78,7 @@ function normalizeEntry(entry) {
     mood,
     score: typeof entry.score === "number" ? entry.score : Number((((mood - 3) / 2)).toFixed(2)),
     note: String(entry.note || ""),
+    interactions,
     dateISO: entry.dateISO || toISOFromDateSlot(date, slot),
     actualLoggedAt: entry.actualLoggedAt || entry.updatedAt || new Date().toISOString(),
     isBackfilled: typeof entry.isBackfilled === "boolean" ? entry.isBackfilled : date !== toDateKey(new Date()),

@@ -422,8 +422,8 @@ textarea {
 
 .mood-pill.active,
 .chip.active {
-  background: rgba(29, 79, 216, 0.514);
-  color: var(--primary);
+  background: var(--gradientCard);
+  color: var(--text);
 }
 
 .entry-card {
@@ -1227,6 +1227,7 @@ textarea {
 
 .analytics-nav-label {
   padding-bottom: 1rem;
+  font-weight: 700;
 }
 
 .streak-month-label {

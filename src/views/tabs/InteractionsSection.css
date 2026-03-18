@@ -1,0 +1,76 @@
+.interactions-container {
+  margin-top: 1rem;
+}
+
+.interactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.interactions-section {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;  /* controls spacing between all interaction cards */
+}
+
+.interaction-card {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.interaction-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.interaction-row input,
+.interaction-row select {
+  flex: 1;
+  min-height: 2.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--inputSurface);
+  padding: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.interaction-context {
+  width: 100%;
+  min-height: 2.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--inputSurface);
+  padding: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.secondary-btn {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: var(--text);
+}
+
+.remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--danger, #888);
+  cursor: pointer;
+  padding: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  color: red;
+}

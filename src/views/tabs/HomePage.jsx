@@ -6,6 +6,7 @@ import { getProfile } from "../../services/profileService";
 import { getMoodOptions } from "../../constants/moods";
 import { filterEntriesByRange, formatRangeLabel, getDateRange } from "../../utils/analyticsRange";
 import { formatLongDate, toDateKey } from "../../utils/date";
+import "./InteractionsSection.css";
 
 const SLOT_OPTIONS = ["morning", "afternoon", "evening", "night"];
 const SLOT_ORDER = { morning: 1, afternoon: 2, evening: 3, night: 4 };
@@ -42,6 +43,7 @@ function createDraft(isPrivateMode) {
     slot: getSlotByHour(now.getHours()),
     mood: isPrivateMode ? 1 : 3,
     note: "",
+    interactions: [],
   };
 }
 
@@ -103,6 +105,7 @@ export default function HomePage() {
         slot: draft.slot,
         mood: draft.mood,
         note: draft.note.trim(),
+        interactions: draft.interactions || [],
         actualLoggedAt: new Date().toISOString(),
         isBackfilled: draft.date !== toDateKey(new Date()),
       };
@@ -127,6 +130,7 @@ export default function HomePage() {
       slot: entry.slot,
       mood: entry.mood,
       note: entry.note || "",
+      interactions: entry.interactions || [],
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -266,6 +270,74 @@ export default function HomePage() {
           onChange={(e) => updateDraft("note", e.target.value)}
           placeholder="Start with a thought, a feeling, or a moment..."
         />
+
+        <div className="interactions-section">
+          <button
+            className="secondary-btn"
+            onClick={() =>
+              setDraft((prev) => ({
+                ...prev,
+                interactions: [
+                  ...(prev.interactions || []),
+                  { person: "", context: "", emotion: "neutral" },
+                ],
+              }))
+            }
+            type="button"
+          >
+            + Add Interaction
+          </button>
+          {(draft.interactions || []).map((item, index) => (
+            <div className="interaction-card" key={index}>
+              <div className="interaction-row">
+                <input
+                  placeholder="Person"
+                  value={item.person}
+                  onChange={(e) => {
+                    const next = [...draft.interactions];
+                    next[index].person = e.target.value;
+                    updateDraft("interactions", next);
+                  }}
+                />
+                <select
+                  value={item.emotion}
+                  onChange={(e) => {
+                    const next = [...draft.interactions];
+                    next[index].emotion = e.target.value;
+                    updateDraft("interactions", next);
+                  }}
+                >
+                  <option value="positive">🙂 Positive</option>
+                  <option value="neutral">😐 Neutral</option>
+                  <option value="pressure">⚡ Pressure</option>
+                </select>
+                <button
+                  className="remove-btn"
+                  onClick={() => {
+                    const next = (draft.interactions || []).filter((_, i) => i !== index);
+                    updateDraft("interactions", next);
+                  }}
+                  title="Remove interaction"
+                  type="button"
+                  aria-label="Remove interaction"
+                >
+                  X
+                </button>
+             
+              </div>
+              <input
+                className="interaction-context"
+                placeholder="What happened?"
+                value={item.context}
+                onChange={(e) => {
+                  const next = [...draft.interactions];
+                  next[index].context = e.target.value;
+                  updateDraft("interactions", next);
+                }}
+              />
+            </div>
+          ))}
+        </div>
 
         <div className="entry-actions-row">
           {editingEntry ? (

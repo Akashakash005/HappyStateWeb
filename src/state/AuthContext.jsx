@@ -18,26 +18,34 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser || null);
-      if (firebaseUser) {
-        const userDocId = getUserDocId(firebaseUser);
-        await setDoc(
-          doc(db, DB_SCHEMA.users, userDocId),
-          {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
-        const snap = await getDoc(doc(db, DB_SCHEMA.users, userDocId));
-        setProfile(snap.exists() ? snap.data() : null);
-      } else {
-        setProfile(null);
-      }
-      setInitializing(false);
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      (async () => {
+        try {
+          setUser(firebaseUser || null);
+          if (firebaseUser) {
+            const userDocId = getUserDocId(firebaseUser);
+            await setDoc(
+              doc(db, DB_SCHEMA.users, userDocId),
+              {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                displayName: firebaseUser.displayName || "",
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true },
+            );
+            const snap = await getDoc(doc(db, DB_SCHEMA.users, userDocId));
+            setProfile(snap.exists() ? snap.data() : null);
+          } else {
+            setProfile(null);
+          }
+        } catch (error) {
+          console.error("Auth initialization failed:", error);
+          setProfile(null);
+        } finally {
+          setInitializing(false);
+        }
+      })();
     });
   }, []);
 
